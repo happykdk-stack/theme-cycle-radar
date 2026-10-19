@@ -6,6 +6,30 @@ import pandas as pd
 from update import OUT, BENCHMARK, series_download
 from update_v2 import build_v2
 
+HORIZONS=(3,5,7,10,15,20,30)
+MIN_TRAIN=8
+MIN_TEST=3
+
+def horizon_report(events):
+    """Chronological 70/30 split; evaluate all horizons on identical matured events."""
+    complete=[e for e in events if all(e.get(f'return_{h}d_pct') is not None for h in HORIZONS)]
+    cutoff=int(len(complete)*0.7)
+    train,test=complete[:cutoff],complete[cutoff:]
+    def summarize(rows,h):
+        a=[float(e[f'return_{h}d_pct']) for e in rows]
+        return {'count':len(a),'win_rate_pct':round(100*sum(x>0 for x in a)/len(a),1) if a else None,
+                'avg_return_pct':round(sum(a)/len(a),2) if a else None}
+    table=[{'days':h,'train':summarize(train,h),'test':summarize(test,h)} for h in HORIZONS]
+    if len(train)<MIN_TRAIN or len(test)<MIN_TEST:
+        return {'status':'insufficient','message':f'동일 기간 평가 가능한 신호 {len(complete)}건 (학습 {len(train)}, 검증 {len(test)}). 최소 {MIN_TRAIN}+{MIN_TEST}건 필요', 'best_days':None,'table':table}
+    # Only positive average-return candidates; win rate is primary, mean return tie-break.
+    eligible=[x for x in table if x['train']['avg_return_pct']>0]
+    if not eligible:
+        return {'status':'no_edge','message':'학습 구간 평균 수익률이 양수인 보유 기간이 없습니다.', 'best_days':None,'table':table}
+    best=max(eligible,key=lambda x:(x['train']['win_rate_pct'],x['train']['avg_return_pct']))
+    return {'status':'evaluated','message':'학습 구간에서 선정, 검증 구간은 독립 평가. 과거 성과는 미래를 보장하지 않습니다.', 'best_days':best['days'],'table':table}
+
+
 def calculate_v3(df, benchmark):
     d=df.sort_index().copy()
     c=d["Close"].astype(float)
@@ -53,7 +77,7 @@ def calculate_v3(df, benchmark):
             if entry is None or i+n>=len(d):return None
             return round((float(c.iloc[i+n])/entry-1)*100,2)
         events.append({"date":d.index[i].date().isoformat(),
-                       "return_5d_pct":outcome(5),"return_20d_pct":outcome(20),
+                       **{f"return_{n}d_pct":outcome(n) for n in HORIZONS},
                        "entry_basis":"next_open"})
     def summary(n):
         a=[x[f"return_{n}d_pct"] for x in events if x[f"return_{n}d_pct"] is not None]
@@ -68,7 +92,8 @@ def calculate_v3(df, benchmark):
                     "시장 방어" if not bool(market_ok.iloc[-1]) else "관찰"),
         "last_signal_v3":events[-1]["date"] if events else None,
         "signals_v3":events[-100:],
-        "stats_v3":{"5d":summary(5),"20d":summary(20)},
+        "stats_v3":{f"{n}d":summary(n) for n in HORIZONS},
+        "holding_period_v3":horizon_report(events),
         "v3_conditions":{"market_uptrend":bool(market_ok.iloc[-1]),
                          "relative_strength_20d_pct":round(float(rs20.iloc[-1])*100,2) if pd.notna(rs20.iloc[-1]) else None,
                          "volume_ratio":round(float(volratio.iloc[-1]),2) if pd.notna(volratio.iloc[-1]) else None,
@@ -86,10 +111,11 @@ def build_v3(fetch=series_download):
             t.update(calculate_v3(cached(t["ticker"]),cached(BENCHMARK[t["market"]])))
         except Exception as exc:
             result["errors"].append({"ticker":t["ticker"],"message":"V3: "+str(exc)[:160]})
-    result["version"]="3.0"
+    result["version"]="3.1"
     result["limitations"].extend([
         "V3는 시장 추세, 5·20·60일 상대강도, 눌림목 회복을 사용하는 실험적 보수형 신호입니다.",
-        "V3 적중률은 과거 관측치이며 미래 성공 확률이 아닙니다. 신호가 적어 표본이 작을 수 있습니다.",
+        "V3.1은 3·5·7·10·15·20·30거래일을 비교합니다. 학습 70%에서 적중률 우선·평균수익률 양수 조건으로 기간을 선정하고, 뒤의 30%에서 검증합니다.",
+        "모든 기간을 공정하게 비교하기 위해 30거래일 이상 경과한 동일 신호만 기간 선정에 사용합니다. 최소 학습 8건·검증 3건 미달 시 추천하지 않습니다.",
         "V3 수익률은 신호 다음 거래일 시가 진입, 5·20거래일 종가 청산 가정이며 수수료·슬리피지·세금은 미반영입니다.",
         "V1은 신호일 종가 기준으로 계산되므로 V3와 직접적인 수익률 비교가 불공정합니다.",
         "ETF 단위 신호이므로 구성종목 확산, 외국인·기관 실매수 및 실제 테마 전체의 자금 흐름은 측정하지 않습니다."
