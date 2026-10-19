@@ -49,7 +49,17 @@ def detect(df,bench):
     score=.45*rs_score+.30*vol_score+.25*momentum
     if stable[-1]=="과열":score*=.7
     if stable[-1]=="쇠퇴":score*=.6
+    previous = None
+    if len(d)>70:
+        p5 = float(r5.iloc[-6]) if pd.notna(r5.iloc[-6]) else 0.
+        p20 = float(r20.iloc[-6]) if pd.notna(r20.iloc[-6]) else 0.
+        pvr = float(vr.iloc[-6]) if pd.notna(vr.iloc[-6]) else 1.
+        previous = .45*float(np.clip(50+400*p20,0,100)) + .30*float(np.clip(50+35*np.log2(max(pvr,.01)),0,100)) + .25*float(np.clip(50+600*p5,0,100))
+    delta = round(score-previous,1) if previous is not None else None
+    confirmation = sum([bool(r5.iloc[-1]>.005),bool(r20.iloc[-1]>r20.shift(5).iloc[-1]),bool(vr.iloc[-1]>1.2 or vr5.iloc[-1]>1.1),bool(c.iloc[-1]>m20.iloc[-1])])*25
     return {"cycle_stage":stable[-1],"cycle_score":round(score,1),
+            "score_change_5d":delta,"transition_strength":round(float(np.clip(50+2*(delta or 0),0,100)),1) if delta is not None else None,
+            "confirmation_score":confirmation,
             "watch_active":bool(watch.iloc[-1]),"watch_first_seen":watch_start,"watch_reasons":reasons,
             "cycle_last_transition":changes[-1]["date"] if changes else None,
             "cycle_previous_stage":changes[-1]["from"] if changes else None,
@@ -69,7 +79,7 @@ def build_v4(fetch=series_download):
     for market in BENCHMARK:
         group=sorted((t for t in result["themes"] if t["market"]==market and "cycle_score" in t),key=lambda t:t["cycle_score"],reverse=True)
         for rank,t in enumerate(group,1):t["market_rank"]=rank
-    result["version"]="4.1"
+    result["version"]="4.2"
     result["limitations"].extend(["조기 징후는 당일 미확정 신호이고, 단계 전환은 연속 2거래일 확인입니다.","사이클 단계는 ETF 가격·거래량 대용지표 기반 추정이며 기관 자금 흐름이 아닙니다.",
         "단계 전환은 연속 2거래일 확인 후 기록됩니다. 점수는 예측 확률이 아닙니다.",
         "실제 구성종목 동반 상승 및 기관·외국인 순매수는 미포함입니다."])
