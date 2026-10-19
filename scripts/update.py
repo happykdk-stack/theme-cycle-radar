@@ -35,11 +35,11 @@ def series_download(symbol):
         raise ValueError('가격 데이터 없음')
     if isinstance(frame.columns, pd.MultiIndex):
         frame.columns = frame.columns.get_level_values(0)
-    frame = frame[['Close','Volume']].copy().dropna()
+    frame = frame[['Open','Close','Volume']].copy().dropna(subset=['Open','Close','Volume'])
     frame.index = pd.to_datetime(frame.index).tz_localize(None).normalize()
     frame = frame[~frame.index.duplicated(keep='last')].sort_index()
     if len(frame)<45: raise ValueError('분석에 필요한 45거래일 미만')
-    if (frame['Close']<=0).any(): raise ValueError('잘못된 가격')
+    if (frame[['Open','Close']]<=0).any().any(): raise ValueError('잘못된 시가 또는 종가')
     return frame
 
 def clamp(v): return round(float(np.clip(v,0,100)),1)
