@@ -16,6 +16,8 @@ def detect(df,bench):
     expand=(r5>.012)&(r20>.035)&trend&(vr5>1.05)
     heat=(c/m20>1.18)|(c.pct_change(20)>.2)
     falling=(r5<-.015)&((c<m20)|(r20<r20.shift(5)-.02))
+    watch=((r5>.005)&(r5>r5.shift(3))&(r20>r20.shift(5))&
+           ((vr>1.2)|(vr5>1.1))&(c>m20*.96)&~falling&~heat).fillna(False)
     raw=[]
     for i in range(len(d)):
         if i<65:raw.append("데이터 부족")
@@ -32,6 +34,15 @@ def detect(df,bench):
         stable.append(last)
     changes=[{"date":d.index[i].date().isoformat(),"from":stable[i-1],"to":stable[i]}
              for i in range(1,len(stable)) if stable[i]!=stable[i-1] and stable[i]!="데이터 부족"]
+    watch_start=None
+    for i in range(65,len(d)):
+        if bool(watch.iloc[i]) and not bool(watch.iloc[i-1]):
+            watch_start=d.index[i].date().isoformat()
+    reasons=[]
+    if pd.notna(r5.iloc[-1]) and r5.iloc[-1]>.005:reasons.append("5일 상대강도 개선")
+    if pd.notna(vr.iloc[-1]) and vr.iloc[-1]>1.2:reasons.append("당일 거래량 증가")
+    if pd.notna(vr5.iloc[-1]) and vr5.iloc[-1]>1.1:reasons.append("5일 평균 거래량 증가")
+    if pd.notna(r20.iloc[-1]) and pd.notna(r20.shift(5).iloc[-1]) and r20.iloc[-1]>r20.shift(5).iloc[-1]:reasons.append("20일 상대강도 가속")
     rs_score=float(np.clip(50+400*(r20.iloc[-1] if pd.notna(r20.iloc[-1]) else 0),0,100))
     vol_score=float(np.clip(50+35*np.log2(max(float(vr.iloc[-1]),.01)),0,100)) if pd.notna(vr.iloc[-1]) else 50.
     momentum=float(np.clip(50+600*(r5.iloc[-1] if pd.notna(r5.iloc[-1]) else 0),0,100))
@@ -39,6 +50,7 @@ def detect(df,bench):
     if stable[-1]=="과열":score*=.7
     if stable[-1]=="쇠퇴":score*=.6
     return {"cycle_stage":stable[-1],"cycle_score":round(score,1),
+            "watch_active":bool(watch.iloc[-1]),"watch_first_seen":watch_start,"watch_reasons":reasons,
             "cycle_last_transition":changes[-1]["date"] if changes else None,
             "cycle_previous_stage":changes[-1]["from"] if changes else None,
             "cycle_transitions":changes[-30:],
@@ -54,8 +66,11 @@ def build_v4(fetch=series_download):
     for t in result["themes"]:
         try:t.update(detect(cached(t["ticker"]),cached(BENCHMARK[t["market"]])))
         except Exception as exc:result["errors"].append({"ticker":t["ticker"],"message":"V4: "+str(exc)[:160]})
-    result["version"]="4.0"
-    result["limitations"].extend(["사이클 단계는 ETF 가격·거래량 대용지표 기반 추정이며 기관 자금 흐름이 아닙니다.",
+    for market in BENCHMARK:
+        group=sorted((t for t in result["themes"] if t["market"]==market and "cycle_score" in t),key=lambda t:t["cycle_score"],reverse=True)
+        for rank,t in enumerate(group,1):t["market_rank"]=rank
+    result["version"]="4.1"
+    result["limitations"].extend(["조기 징후는 당일 미확정 신호이고, 단계 전환은 연속 2거래일 확인입니다.","사이클 단계는 ETF 가격·거래량 대용지표 기반 추정이며 기관 자금 흐름이 아닙니다.",
         "단계 전환은 연속 2거래일 확인 후 기록됩니다. 점수는 예측 확률이 아닙니다.",
         "실제 구성종목 동반 상승 및 기관·외국인 순매수는 미포함입니다."])
     if result["errors"] and result["status"]=="ok":result["status"]="partial"
