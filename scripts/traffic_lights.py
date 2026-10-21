@@ -1,4 +1,4 @@
-"""Independent ETF trend signals from completed exchange sessions only."""
+"""ETF trend signals including the latest completed session of open periods."""
 from functools import lru_cache
 import numpy as np
 import pandas as pd
@@ -67,14 +67,18 @@ def traffic_light(frame, market, now=None):
         rows = []
         for _, group in aligned.groupby(sessions.to_period(frequency)):
             final = group.index[-1]
-            if close_times.loc[final] > now:
+            # For the current week/month use the most recent completed session,
+            # even before the calendar period ends. Historical periods retain
+            # their final scheduled close to avoid look-ahead bias.
+            available = group.index.intersection(completed)
+            if not len(available):
                 continue
-            # Only the final close defines a period close. Interior missing days
-            # must not invalidate six months of otherwise available month-end
-            # prices (calendars/providers can disagree on exceptional holidays).
-            # Still reject partial listing periods and missing final closes.
+            is_current = final > completed[-1]
+            bar_day = available[-1] if is_current else final
+            if not is_current and close_times.loc[final] > now:
+                continue
             full_period = group.index[0] >= close.index[0]
-            rows.append((final, group.iloc[-1] if full_period else np.nan))
+            rows.append((bar_day, aligned.loc[bar_day] if full_period else np.nan))
         bars = pd.Series(dict(rows), dtype=float).sort_index()
         ma = bars.rolling(5, min_periods=5).mean()
         previous = ma.shift(1)
@@ -99,6 +103,8 @@ def traffic_light(frame, market, now=None):
                    for i in range(1, len(signals))
                    if initial is not None and signals.index[i] > initial
                    and signals.iloc[i] != signals.iloc[i-1]]
+    for key in FREQUENCIES:
+        snapshots[key]["provisional"] = key != "daily" and snapshots[key]["asof"] is not None and pd.Timestamp(snapshots[key]["asof"]).to_period(FREQUENCIES[key]) == local_today.to_period(FREQUENCIES[key])
     return {"signal": signals.iloc[-1], "timeframes": snapshots,
             "asof": completed[-1].date().isoformat(),
             "initial_since": initial.date().isoformat() if initial is not None else None,
