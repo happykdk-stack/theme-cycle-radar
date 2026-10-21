@@ -69,8 +69,12 @@ def traffic_light(frame, market, now=None):
             final = group.index[-1]
             if close_times.loc[final] > now:
                 continue
-            # Never turn an incomplete period or a missing final close into a bar.
-            rows.append((final, group.iloc[-1] if group.notna().all() else np.nan))
+            # Only the final close defines a period close. Interior missing days
+            # must not invalidate six months of otherwise available month-end
+            # prices (calendars/providers can disagree on exceptional holidays).
+            # Still reject partial listing periods and missing final closes.
+            full_period = group.index[0] >= close.index[0]
+            rows.append((final, group.iloc[-1] if full_period else np.nan))
         bars = pd.Series(dict(rows), dtype=float).sort_index()
         ma = bars.rolling(5, min_periods=5).mean()
         previous = ma.shift(1)

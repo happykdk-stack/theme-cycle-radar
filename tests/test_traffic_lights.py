@@ -88,6 +88,19 @@ class TrafficLightTests(unittest.TestCase):
         for f in [pd.DataFrame(), self.frame().tail(4)]:
             self.assertEqual(traffic_light(f,'미국','2025-08-29T21:00Z')['signal'],'gray')
 
+    def test_interior_gap_does_not_erase_available_period_closes(self):
+        f = self.frame()
+        f = f.drop(pd.Timestamp('2025-06-03'))
+        r = traffic_light(f, '미국', '2025-08-29T21:00Z')
+        self.assertEqual(r['signal'], 'green')
+        self.assertEqual(r['timeframes']['monthly']['state'], 'up')
+
+    def test_missing_final_month_close_is_insufficient(self):
+        f = self.frame().drop(pd.Timestamp('2025-07-31'))
+        r = traffic_light(f, '미국', '2025-08-29T21:00Z')
+        self.assertEqual(r['signal'], 'gray')
+        self.assertEqual(r['timeframes']['monthly']['state'], 'insufficient')
+
     def test_sort_duplicates_and_timezone(self):
         f = self.frame()
         expected = traffic_light(f,'미국','2025-08-29T21:00Z')
