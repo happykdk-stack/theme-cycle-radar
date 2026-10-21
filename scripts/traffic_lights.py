@@ -62,6 +62,10 @@ def traffic_light(frame, market, now=None):
     if completed.empty:
         return empty_signal()
     aligned = close.reindex(sessions)
+    # Missing recent sessions invalidate the live signal rather than silently
+    # treating an older quote as the current week/month's latest price.
+    if aligned.reindex(completed[-5:]).isna().any():
+        return empty_signal()
     histories, snapshots = {}, {}
     for key, frequency in FREQUENCIES.items():
         rows = []
