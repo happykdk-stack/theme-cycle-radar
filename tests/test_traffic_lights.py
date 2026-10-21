@@ -120,8 +120,8 @@ class TrafficLightTests(unittest.TestCase):
         f = self.frame(end='2025-09-05')
         f.loc['2025-09-02':, 'Close'] = 100.
         r = traffic_light(f,'미국','2025-09-05T21:00Z')
-        self.assertEqual(r['signal'], 'yellow')
-        self.assertEqual(r['last_changed'], '2025-09-02')
+        self.assertEqual(r['signal'], 'red')
+        self.assertEqual(r['last_changed'], '2025-09-05')
         prior = traffic_light(f,'미국','2025-08-29T21:00Z')
         self.assertEqual(prior['signal'], 'green')
         self.assertIsNone(prior['last_changed'])
