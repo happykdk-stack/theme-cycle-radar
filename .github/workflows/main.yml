@@ -8,6 +8,7 @@ on:
   workflow_dispatch:
   schedule:
     - cron: '30 9 * * 1-5'
+    - cron: '30 22 * * 1-5'
 
 permissions:
   contents: read
@@ -21,6 +22,9 @@ concurrency:
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
 
     steps:
       - name: Checkout repository
@@ -37,8 +41,21 @@ jobs:
       - name: Run unit tests
         run: python -m unittest discover -s tests -v
 
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Test dashboard rendering
+        run: node --test tests/test_dashboard.cjs
+
       - name: Update market data
-        run: python scripts/update_v4.py 
+        run: python scripts/update_v4.py
+
+      - name: Validate ETF signal data and stamp deployment
+        env:
+          BUILD_SHA: ${{ github.sha }}
+        run: python scripts/validate_site.py
 
       - name: Configure Pages
         uses: actions/configure-pages@v5
@@ -49,4 +66,5 @@ jobs:
           path: site
 
       - name: Deploy website
+        id: deployment
         uses: actions/deploy-pages@v4

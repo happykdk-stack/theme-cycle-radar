@@ -5,7 +5,7 @@
 ## 1. 설치 (GitHub 웹사이트만 사용)
 
 1. GitHub에서 **New repository**를 눌러 `theme-cycle-radar`라는 **Public** 저장소를 만들고, 기본 브랜치를 `main`으로 설정합니다. (Private 저장소의 Pages 사용 가능 여부는 요금제에 따라 다릅니다.)
-2. 이 ZIP을 풀고 **숨김 폴더 `.github`를 포함한 모든 파일과 폴더**를 저장소 루트에 업로드합니다. `site/index.html`, `scripts/update.py`, `.github/workflows/pages.yml`, `requirements.txt`가 있어야 합니다.
+2. 이 ZIP을 풀고 **숨김 폴더 `.github`를 포함한 모든 파일과 폴더**를 저장소 루트에 업로드합니다. `site/index.html`, `scripts/update_v4.py`, `.github/workflows/main.yml`, `requirements.txt`가 있어야 합니다.
 3. 저장소 **Settings → Pages → Build and deployment → Source**를 **GitHub Actions**로 변경합니다.
 4. 저장소 **Actions → Refresh theme radar and deploy → Run workflow**를 실행합니다.
 5. 작업이 성공하면 `https://<사용자명>.github.io/theme-cycle-radar/`에서 확인합니다. 첫 배포까지 몇 분 걸릴 수 있습니다.
@@ -15,7 +15,7 @@
 
 ## 2. 갱신 방식
 
-- `.github/workflows/pages.yml`의 `schedule`이 평일 **UTC 00:30, 09:30**에 실행됩니다. 한국시간 **09:30, 18:30**입니다. 미국 장 마감 시각과 서머타임 때문에 09:30 KST의 미국 자료는 직전 거래일 또는 아직 갱신되지 않은 자료일 수 있습니다.
+- `.github/workflows/main.yml`이 평일 **UTC 09:30, 22:30**에 실행됩니다. 한국시간 **18:30, 다음날 07:30**으로 한국·미국 장 마감 후 갱신합니다. 공급자 반영이 늦으면 해당 시간대 신호등은 회색으로 표시될 수 있습니다.
 - **Run workflow**로 수동 갱신도 가능합니다.
 - 브라우저의 **최신 데이터 다시 읽기** 버튼은 이미 배포된 JSON을 다시 불러옵니다. 서버 수집 작업 자체를 실행하지는 않습니다.
 - 데이터가 36시간 이상 오래되면 화면에 경고가 표시됩니다. 주말에는 정상적으로 이 경고가 뜰 수 있습니다.
@@ -41,7 +41,9 @@ Python 3.11 이상 환경에서:
 ```bash
 pip install -r requirements.txt
 python -m unittest discover -s tests -v
-python scripts/update.py
+node --test tests/test_dashboard.cjs
+python scripts/update_v4.py
+python scripts/validate_site.py
 python -m http.server 8000 --directory site
 ```
 
@@ -57,7 +59,7 @@ python -m http.server 8000 --directory site
 ## 6. 파일 구조
 
 ```
-.github/workflows/pages.yml   자동 수집 및 GitHub Pages 배포
+.github/workflows/main.yml    자동 수집 및 GitHub Pages 배포
 scripts/update.py             ETF 수집, 점수, 신호 계산
 site/index.html               대시보드 UI
 site/data.json                실행 시 생성 (처음에는 없음)
@@ -66,3 +68,17 @@ requirements.txt              Python 패키지
 ```
 
 **주의:** 이 프로젝트는 시장 관찰용 시제품입니다. 1년간 전체 테마에 대한 검증된 정확도 수치는 아직 제공하지 않습니다.
+
+## 7. ETF 월·주·일 신호등 (Cycle Detector 4.2 유지)
+
+`scripts/traffic_lights.py`는 기존 4.2 점수·단계·전환 강도·5일 변화·조건 확인도와 독립적으로 계산합니다. `data.json`의 각 ETF에 `etf_trend`를 추가하며 기존 필드와 계산식은 유지합니다.
+
+- 한국 XKRX, 미국 XNYS 거래소 달력의 장 마감 시각(UTC), 휴장일 및 조기 폐장을 사용합니다. 일봉은 마감한 거래일만, 주봉은 해당 주의 마지막 예정 거래일이 마감한 뒤, 월봉은 해당 월의 마지막 예정 거래일이 마감한 뒤 확정합니다. 금요일 휴장 시 목요일 종가가 주봉 종가가 될 수 있습니다.
+- 각 시간대의 최근 완성봉 종가가 MA5보다 높고 MA5가 직전 완성봉의 MA5보다 높으면 **상승**입니다. 두 부등호가 모두 반대면 **하락**, 나머지(같음 포함)는 **혼재·보합**입니다. MA5 방향을 비교하므로 최소 6개 완성봉이 필요합니다.
+- **종합 초록**=3개 상승, **빨강**=3개 하락, **노랑**=혼재·보합, **회색**=한 시간대라도 데이터 부족입니다. 신호는 색상과 텍스트를 함께 표시합니다.
+- 일부 거래일 누락, 유효하지 않은 종가 또는 상장 첫 불완전 주·월은 완성봉으로 채워 넣지 않습니다. 예정된 최신 마감봉이 누락되면 이전 상승 신호를 최신 신호로 대신 표시하지 않습니다. 수집 실패 ETF도 회색 행으로 남깁니다.
+- `last_changed`는 동일 과거 일별 시점에서 완성된 봉만 사용해 종합 색상이 마지막으로 바뀐 거래일입니다. 최초 유효 신호는 `initial_since`에 기록하며 변경으로 세지 않습니다. 이력은 최근 60건을 제공합니다. 조회 범위(현재 18개월) 이전의 변경일은 알 수 없고, 조정주가·공급자 수정·거래소 달력 수정에 따라 재계산 결과가 달라질 수 있습니다.
+- 화면에서 시간대별 기준일, 종가, MA5, 직전 MA5를 확인할 수 있습니다. 한국/미국 필터는 ETF 표, 색상별 개수 및 기존 4.2 표에 함께 적용합니다.
+- 배포 전 Python 계산·회귀 테스트와 Node 화면 테스트를 실행하고 생성 JSON을 검증합니다. `site/build.json`에 게시 커밋과 생성 시각을 남깁니다. 전체 수집 실패 또는 신호 계산 오류면 기존 게시본을 유지합니다.
+
+이 신호는 ETF 추세를 설명하며 개별 종목 진입이나 매매를 자동 실행하지 않습니다.

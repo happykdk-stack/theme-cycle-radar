@@ -1,7 +1,8 @@
 import json
 import numpy as np
 import pandas as pd
-from update import OUT, BENCHMARK, series_download, build
+from update import OUT, BENCHMARK, THEMES, series_download, build
+from traffic_lights import traffic_light, empty_signal
 
 def detect(df,bench):
     d=df.sort_index()
@@ -67,22 +68,39 @@ def detect(df,bench):
             "cycle_metrics":{"rs_20d_pct":round(float(r20.iloc[-1])*100,2) if pd.notna(r20.iloc[-1]) else None,
                              "volume_ratio":round(float(vr.iloc[-1]),2) if pd.notna(vr.iloc[-1]) else None}}
 
-def build_v4(fetch=series_download):
+def build_v4(fetch=series_download, now=None):
     cache={}
     def cached(t):
         if t not in cache:cache[t]=fetch(t)
         return cache[t]
     result=build(cached)
+    # Preserve failed ETFs as gray rows; benchmark failures must not hide ETF trends.
+    present={t["ticker"] for t in result["themes"]}
+    for market,theme,ticker,fund in THEMES:
+        if ticker not in present:
+            result["themes"].append({"market":market,"theme":theme,"ticker":ticker,"fund":fund,"asof":None})
     for t in result["themes"]:
+        t["etf_trend"]=empty_signal()
+        try:frame=cached(t["ticker"])
+        except Exception as exc:
+            result["errors"].append({"ticker":t["ticker"],"message":"ETF trend: "+str(exc)[:160]})
+        else:
+            try:t["etf_trend"]=traffic_light(frame,t["market"],now=now or result["generated_at_utc"])
+            except Exception as exc:
+                result["errors"].append({"ticker":t["ticker"],"message":"ETF trend calculation: "+str(exc)[:160]})
         try:t.update(detect(cached(t["ticker"]),cached(BENCHMARK[t["market"]])))
         except Exception as exc:result["errors"].append({"ticker":t["ticker"],"message":"V4: "+str(exc)[:160]})
     for market in BENCHMARK:
         group=sorted((t for t in result["themes"] if t["market"]==market and "cycle_score" in t),key=lambda t:t["cycle_score"],reverse=True)
         for rank,t in enumerate(group,1):t["market_rank"]=rank
     result["version"]="4.2"
+    result["etf_trend_version"]="1.0"
     result["limitations"].extend(["조기 징후는 당일 미확정 신호이고, 단계 전환은 연속 2거래일 확인입니다.","사이클 단계는 ETF 가격·거래량 대용지표 기반 추정이며 기관 자금 흐름이 아닙니다.",
         "단계 전환은 연속 2거래일 확인 후 기록됩니다. 점수는 예측 확률이 아닙니다.",
-        "실제 구성종목 동반 상승 및 기관·외국인 순매수는 미포함입니다."])
+        "실제 구성종목 동반 상승 및 기관·외국인 순매수는 미포함입니다.",
+        "ETF 신호등은 거래소 달력상 완성봉만 사용합니다. 상승=종가>MA5 및 MA5 상승, 하락=종가<MA5 및 MA5 하락, 그 외=혼재·보합입니다.",
+        "종합 초록=월·주·일 모두 상승, 빨강=모두 하락, 노랑=혼재·보합, 회색=한 시간대라도 데이터 부족. MA5 방향 비교에는 최소 6개 완성봉이 필요합니다.",
+        "최근 신호 변경일은 ETF 종합 색상이 바뀐 거래일입니다. 최초 산출은 변경으로 세지 않으며 공급자 과거 수정에 따라 달라질 수 있습니다."])
     if result["errors"] and result["status"]=="ok":result["status"]="partial"
     return result
 
