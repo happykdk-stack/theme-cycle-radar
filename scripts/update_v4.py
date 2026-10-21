@@ -4,6 +4,8 @@ import pandas as pd
 from update import OUT, BENCHMARK, THEMES, series_download, build
 from traffic_lights import traffic_light, empty_signal
 
+SECURITIES_ETF = {"market":"한국", "ticker":"102970.KS", "fund":"KODEX 증권"}
+
 def detect(df,bench):
     d=df.sort_index()
     c=d["Close"].astype(float); v=d["Volume"].astype(float)
@@ -74,6 +76,15 @@ def build_v4(fetch=series_download, now=None):
         if t not in cache:cache[t]=fetch(t)
         return cache[t]
     result=build(cached)
+    guide={**SECURITIES_ETF, "etf_trend":empty_signal()}
+    try:guide_frame=cached(guide["ticker"])
+    except Exception as exc:
+        result["errors"].append({"ticker":guide["ticker"],"message":"Securities ETF: "+str(exc)[:160]})
+    else:
+        try:guide["etf_trend"]=traffic_light(guide_frame,guide["market"],now=now or result["generated_at_utc"])
+        except Exception as exc:
+            result["errors"].append({"ticker":guide["ticker"],"message":"ETF trend calculation: "+str(exc)[:160]})
+    result["securities_etf"]=guide
     # Preserve failed ETFs as gray rows; benchmark failures must not hide ETF trends.
     present={t["ticker"] for t in result["themes"]}
     for market,theme,ticker,fund in THEMES:

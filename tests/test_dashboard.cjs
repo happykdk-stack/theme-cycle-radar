@@ -63,3 +63,18 @@ test('empty market renders an explicit empty state',()=>{
  const {nodes,run}=setup();run('data={themes:[]};render()');
  assert.ok(nodes.get('etf-signals').text.includes('표시할 ETF 없음'));
 });
+test('securities ETF is first panel and remains visible for every market filter',()=>{
+ const {nodes,run}=setup();
+ assert.ok(html.indexOf('id="securities-heading"')<html.indexOf('id="status"'));
+ const guide=fixture('한국','green');
+ run('data='+JSON.stringify({securities_etf:guide,themes:[fixture('미국','red')]})+';market="미국";render()');
+ assert.ok(nodes.get('securities-signal').text.includes('초록 · 3개 상승'));
+ assert.equal(nodes.get('securities-frames').children.length,3);
+ assert.ok(nodes.get('securities-dates').text.includes('2025-08-28'));
+ assert.ok(nodes.get('securities-frames').text.includes('MA5 110'));
+});
+test('missing securities ETF data stays gray rather than using theme signals',()=>{
+ const {nodes,run}=setup();run('data={themes:[]};render()');
+ assert.ok(nodes.get('securities-signal').text.includes('회색 · 데이터 부족'));
+ assert.equal(nodes.get('securities-frames').children.length,3);
+});

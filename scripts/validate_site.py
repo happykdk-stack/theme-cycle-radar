@@ -9,7 +9,8 @@ assert data['version'] == '4.2'
 assert data['etf_trend_version'] == '1.0'
 assert data['status'] != 'error'
 assert data['themes']
-for theme in data['themes']:
+assert data['securities_etf']['ticker'] == '102970.KS'
+for theme in [*data['themes'], data['securities_etf']]:
     trend = theme['etf_trend']
     assert trend['signal'] in ('green', 'yellow', 'red', 'gray')
     assert set(trend['timeframes']) == {'monthly', 'weekly', 'daily'}

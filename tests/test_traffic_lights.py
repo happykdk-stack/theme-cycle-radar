@@ -157,6 +157,29 @@ class TrafficLightTests(unittest.TestCase):
         self.assertTrue(all(t['etf_trend']['signal']=='gray' for t in r['themes']))
         self.assertTrue(any('calendar unavailable' in e['message'] for e in r['errors']))
 
+    def test_securities_etf_is_separate_from_existing_theme_scores(self):
+        f = self.frame(market='한국')
+        calls = []
+        def fetch(ticker):
+            calls.append(ticker)
+            return f
+        r = build_v4(fetch, now='2025-08-29T21:00Z')
+        self.assertEqual(r['securities_etf']['ticker'], '102970.KS')
+        self.assertEqual(r['securities_etf']['etf_trend']['signal'], 'green')
+        self.assertEqual(calls.count('102970.KS'), 1)
+        self.assertEqual(len(r['themes']), 14)
+
+    def test_failed_securities_etf_is_gray_without_losing_themes(self):
+        f = self.frame()
+        def fetch(ticker):
+            if ticker == '102970.KS':
+                raise RuntimeError('securities ETF unavailable')
+            return f
+        r = build_v4(fetch, now='2025-08-29T21:00Z')
+        self.assertEqual(r['securities_etf']['etf_trend']['signal'], 'gray')
+        self.assertEqual(r['status'], 'partial')
+        self.assertEqual(len(r['themes']), 14)
+
 
 if __name__ == '__main__':
     unittest.main()
