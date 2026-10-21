@@ -40,8 +40,16 @@ class TrafficLightTests(unittest.TestCase):
         actual = traffic_light(f, '미국', '2025-08-29T19:59Z')
         self.assertEqual(actual, expected)
         self.assertEqual(actual['asof'], '2025-08-28')
-        self.assertEqual(actual['timeframes']['weekly']['asof'], '2025-08-22')
-        self.assertEqual(actual['timeframes']['monthly']['asof'], '2025-07-31')
+        self.assertEqual(actual['timeframes']['weekly']['asof'], '2025-08-28')
+        self.assertEqual(actual['timeframes']['monthly']['asof'], '2025-08-28')
+
+    def test_current_month_and_week_are_provisional(self):
+        f = self.frame(end='2025-08-29')
+        r = traffic_light(f, '미국', '2025-08-27T21:00Z')
+        self.assertEqual(r['timeframes']['monthly']['asof'], '2025-08-27')
+        self.assertEqual(r['timeframes']['weekly']['asof'], '2025-08-27')
+        self.assertTrue(r['timeframes']['monthly']['provisional'])
+        self.assertTrue(r['timeframes']['weekly']['provisional'])
 
     def test_krx_close_boundary(self):
         f = self.frame(market='한국')
@@ -67,7 +75,7 @@ class TrafficLightTests(unittest.TestCase):
     def test_midweek_month_end_does_not_complete_week(self):
         f = self.frame(end='2025-04-30')
         r = traffic_light(f, '미국', '2025-04-30T21:00Z')
-        self.assertEqual(r['timeframes']['weekly']['asof'], '2025-04-25')
+        self.assertEqual(r['timeframes']['weekly']['asof'], '2025-04-30')
         self.assertEqual(r['timeframes']['monthly']['asof'], '2025-04-30')
 
     def test_six_months_required_and_partial_first_month_excluded(self):
