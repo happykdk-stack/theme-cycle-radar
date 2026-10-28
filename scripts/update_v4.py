@@ -37,6 +37,18 @@ def detect(df,bench):
         stable.append(last)
     changes=[{"date":d.index[i].date().isoformat(),"from":stable[i-1],"to":stable[i]}
              for i in range(1,len(stable)) if stable[i]!=stable[i-1] and stable[i]!="데이터 부족"]
+    # Performance of the current uninterrupted, confirmed expansion stage only.
+    expansion_since = None
+    expansion_return_pct = None
+    if stable and stable[-1] == "상승 확산":
+        first = len(stable) - 1
+        while first > 0 and stable[first - 1] == "상승 확산":
+            first -= 1
+        start_close = c.iloc[first]
+        end_close = c.iloc[-1]
+        if pd.notna(start_close) and pd.notna(end_close) and start_close > 0 and end_close > 0:
+            expansion_since = d.index[first].date().isoformat()
+            expansion_return_pct = round(float((end_close / start_close - 1) * 100), 2)
     watch_start=None
     for i in range(65,len(d)):
         if bool(watch.iloc[i]) and not bool(watch.iloc[i-1]):
@@ -61,6 +73,7 @@ def detect(df,bench):
     delta = round(score-previous,1) if previous is not None else None
     confirmation = sum([bool(r5.iloc[-1]>.005),bool(r20.iloc[-1]>r20.shift(5).iloc[-1]),bool(vr.iloc[-1]>1.2 or vr5.iloc[-1]>1.1),bool(c.iloc[-1]>m20.iloc[-1])])*25
     return {"cycle_stage":stable[-1],"cycle_score":round(score,1),
+            "expansion_since":expansion_since,"expansion_return_pct":expansion_return_pct,
             "score_change_5d":delta,"transition_strength":round(float(np.clip(50+2*(delta or 0),0,100)),1) if delta is not None else None,
             "confirmation_score":confirmation,
             "watch_active":bool(watch.iloc[-1]),"watch_first_seen":watch_start,"watch_reasons":reasons,
