@@ -29,14 +29,14 @@ const fixture=(market,signal)=>({market,theme:'테스트',ticker:market==='한�
  monthly:{state:'up',asof:'2025-07-31',close:120,ma5:110,previous_ma5:108},
  weekly:{state:'down',asof:'2025-08-22'},daily:{state:'mixed',asof:'2025-08-29'}}}});
 test('theme table displays active expansion date and return with sign',()=>{
- const {nodes,run}=setup();const x=fixture('한국','green');x.cycle_stage='상승 확산';x.expansion_since='2025-08-20';x.expansion_return_pct=4.25;
+ const {nodes,run}=setup();const x=fixture('한국','green');x.cycle_stage='상승 확산';x.strength_since='2025-08-20';x.strength_return_pct=4.25;
  run('data='+JSON.stringify({themes:[x]})+';render()');
  const row=nodes.get('themes').children[0];assert.equal(row.children[3].text,'2025-08-20');assert.equal(row.children[4].text,'+4.25%');assert.equal(row.children[4].className,'ok');
  assert.equal(row.children[7].text,'70');assert.equal(row.children[8].text,'60');
  assert.ok(!html.includes('id="etf-signals"'));
 });
-test('non-expansion stage hides date and return',()=>{
- const {nodes,run}=setup();run('data='+JSON.stringify({themes:[fixture('미국','red')]})+';render()');
+test('strength below 60 hides date and return',()=>{
+ const {nodes,run}=setup();const x=fixture('미국','red');x.cycle_score=55;run('data='+JSON.stringify({themes:[x]})+';render()');
  const row=nodes.get('themes').children[0];assert.equal(row.children[3].text,'없음');assert.equal(row.children[4].text,'N/A');
 });
 test('market filter preserves theme table',()=>{

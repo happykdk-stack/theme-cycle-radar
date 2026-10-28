@@ -64,6 +64,26 @@ def detect(df,bench):
     score=.45*rs_score+.30*vol_score+.25*momentum
     if stable[-1]=="과열":score*=.7
     if stable[-1]=="쇠퇴":score*=.6
+    # Reconstruct historical daily cycle strength using the same score formula.
+    # Only the latest uninterrupted run at or above 60 is eligible.
+    rs_history = (50 + 400 * r20.fillna(0)).clip(0, 100)
+    vol_history = pd.Series(50.0, index=d.index)
+    valid_volume = vr.notna()
+    vol_history.loc[valid_volume] = (50 + 35 * np.log2(vr.loc[valid_volume].clip(lower=.01))).clip(0, 100)
+    momentum_history = (50 + 600 * r5.fillna(0)).clip(0, 100)
+    strength_history = .45 * rs_history + .30 * vol_history + .25 * momentum_history
+    stage_penalty = pd.Series([.7 if stage == "과열" else .6 if stage == "쇠퇴" else 1.0 for stage in stable], index=d.index)
+    strength_history *= stage_penalty
+    strength_since = None
+    strength_return_pct = None
+    if len(d) >= 66 and pd.notna(strength_history.iloc[-1]) and round(float(strength_history.iloc[-1]), 1) >= 60:
+        first = len(d) - 1
+        while first > 65 and pd.notna(strength_history.iloc[first - 1]) and round(float(strength_history.iloc[first - 1]), 1) >= 60:
+            first -= 1
+        base_price, current_price = c.iloc[first], c.iloc[-1]
+        if pd.notna(base_price) and pd.notna(current_price) and base_price > 0 and current_price > 0:
+            strength_since = d.index[first].date().isoformat()
+            strength_return_pct = round(float((current_price / base_price - 1) * 100), 2)
     previous = None
     if len(d)>70:
         p5 = float(r5.iloc[-6]) if pd.notna(r5.iloc[-6]) else 0.
@@ -74,6 +94,7 @@ def detect(df,bench):
     confirmation = sum([bool(r5.iloc[-1]>.005),bool(r20.iloc[-1]>r20.shift(5).iloc[-1]),bool(vr.iloc[-1]>1.2 or vr5.iloc[-1]>1.1),bool(c.iloc[-1]>m20.iloc[-1])])*25
     return {"cycle_stage":stable[-1],"cycle_score":round(score,1),
             "expansion_since":expansion_since,"expansion_return_pct":expansion_return_pct,
+            "strength_since":strength_since,"strength_return_pct":strength_return_pct,
             "score_change_5d":delta,"transition_strength":round(float(np.clip(50+2*(delta or 0),0,100)),1) if delta is not None else None,
             "confirmation_score":confirmation,
             "watch_active":bool(watch.iloc[-1]),"watch_first_seen":watch_start,"watch_reasons":reasons,
