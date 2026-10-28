@@ -25,7 +25,7 @@ def combine(states):
 
 def empty_signal():
     return {"signal": "gray", "last_changed": None, "initial_since": None,
-            "asof": None, "transitions": [], "green_performance": None, "timeframes": {
+            "asof": None, "transitions": [], "green_performance": None, "green_since": None, "timeframes": {
                 key: {"state": "insufficient", "asof": None, "close": None,
                       "ma5": None, "previous_ma5": None}
                 for key in FREQUENCIES}}
@@ -107,28 +107,27 @@ def traffic_light(frame, market, now=None):
                    for i in range(1, len(signals))
                    if initial is not None and signals.index[i] > initial
                    and signals.iloc[i] != signals.iloc[i-1]]
-    # Most recent contiguous all-green run, including a completed run.
+    # Track only the current uninterrupted triple-green run.
     green_performance = None
-    green_days = signals.index[signals == "green"]
-    if len(green_days):
-        last_green = green_days[-1]
-        end_pos = signals.index.get_loc(last_green)
-        start_pos = end_pos
-        while start_pos > 0 and signals.iloc[start_pos - 1] == "green":
-            start_pos -= 1
-        start_day = signals.index[start_pos]
-        base_price = aligned.loc[start_day]
-        end_day = completed[-1] if signals.iloc[-1] == "green" else last_green
-        period_prices = aligned.loc[start_day:end_day].dropna()
-        if pd.notna(base_price) and base_price > 0 and len(period_prices):
+    green_since = None
+    if signals.iloc[-1] == "green":
+        pos = len(signals) - 1
+        while pos > 0 and signals.iloc[pos - 1] == "green":
+            pos -= 1
+        first = signals.index[pos]
+        latest = completed[-1]
+        base = aligned.loc[first]
+        prices = aligned.loc[first:latest].dropna()
+        if pd.notna(base) and base > 0 and len(prices) and prices.index[-1] == latest:
+            green_since = first.date().isoformat()
             green_performance = {
-                "start_date": start_day.date().isoformat(),
-                "end_date": end_day.date().isoformat(),
-                "start_price": round(float(base_price), 4),
-                "end_price": round(float(period_prices.iloc[-1]), 4),
-                "return_pct": round(float((period_prices.iloc[-1] / base_price - 1) * 100), 2),
-                "peak_return_pct": round(float((period_prices.max() / base_price - 1) * 100), 2),
-                "active": bool(signals.iloc[-1] == "green"),
+                "start_date": green_since,
+                "end_date": latest.date().isoformat(),
+                "start_price": round(float(base), 4),
+                "end_price": round(float(prices.iloc[-1]), 4),
+                "return_pct": round(float((prices.iloc[-1] / base - 1) * 100), 2),
+                "peak_return_pct": round(float((prices.max() / base - 1) * 100), 2),
+                "active": True,
             }
     for key in FREQUENCIES:
         snapshots[key]["provisional"] = key != "daily" and snapshots[key]["asof"] is not None and pd.Timestamp(snapshots[key]["asof"]).to_period(FREQUENCIES[key]) == local_today.to_period(FREQUENCIES[key])
@@ -136,4 +135,4 @@ def traffic_light(frame, market, now=None):
             "asof": completed[-1].date().isoformat(),
             "initial_since": initial.date().isoformat() if initial is not None else None,
             "last_changed": transitions[-1]["date"] if transitions else None,
-            "transitions": transitions[-60:], "green_performance": green_performance}
+            "transitions": transitions[-60:], "green_performance": green_performance, "green_since": green_since}
