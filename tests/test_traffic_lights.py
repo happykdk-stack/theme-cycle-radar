@@ -140,7 +140,7 @@ class TrafficLightTests(unittest.TestCase):
         r = build_v4(lambda ticker: f, now='2025-08-29T21:00Z')
         baseline = detect(f, f)
         self.assertEqual(r['version'], '4.2')
-        self.assertEqual(len(r['themes']), 14)
+        self.assertEqual(len(r['themes']), 16)
         for theme in r['themes']:
             for key, value in baseline.items():
                 self.assertEqual(theme[key], value, key)
@@ -175,7 +175,7 @@ class TrafficLightTests(unittest.TestCase):
         self.assertEqual(r['securities_etf']['ticker'], '102970.KS')
         self.assertEqual(r['securities_etf']['etf_trend']['signal'], 'green')
         self.assertEqual(calls.count('102970.KS'), 1)
-        self.assertEqual(len(r['themes']), 14)
+        self.assertEqual(len(r['themes']), 16)
 
     def test_failed_securities_etf_is_gray_without_losing_themes(self):
         f = self.frame()
@@ -186,7 +186,7 @@ class TrafficLightTests(unittest.TestCase):
         r = build_v4(fetch, now='2025-08-29T21:00Z')
         self.assertEqual(r['securities_etf']['etf_trend']['signal'], 'gray')
         self.assertEqual(r['status'], 'partial')
-        self.assertEqual(len(r['themes']), 14)
+        self.assertEqual(len(r['themes']), 16)
 
 
 if __name__ == '__main__':
