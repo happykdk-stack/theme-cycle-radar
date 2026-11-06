@@ -34,7 +34,14 @@ def series_download(symbol, period='18mo'):
     frame = yf.download(symbol, period=period, interval='1d', auto_adjust=True,
                         progress=False, threads=False, timeout=20)
     if frame is None or frame.empty:
-        raise ValueError('가격 데이터 없음')
+        # Yahoo's batch endpoint occasionally returns an empty US ETF response.
+        # Retry through the single-ticker history endpoint before marking missing.
+        try:
+            frame = yf.Ticker(symbol).history(period=period, interval='1d', auto_adjust=True)
+        except Exception as exc:
+            raise ValueError(f'가격 데이터 없음 (다운로드 및 개별 조회 실패: {str(exc)[:100]})') from exc
+        if frame is None or frame.empty:
+            raise ValueError('가격 데이터 없음 (다운로드 및 개별 조회 모두 빈 응답)')
     if isinstance(frame.columns, pd.MultiIndex):
         frame.columns = frame.columns.get_level_values(0)
     frame = frame[['Open','Close','Volume']].copy().dropna(subset=['Open','Close','Volume'])

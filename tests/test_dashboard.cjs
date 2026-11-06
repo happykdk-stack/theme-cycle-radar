@@ -25,7 +25,7 @@ function setup(){
 const fixture=(market,signal)=>({market,theme:'테스트',ticker:market==='한국'?'KR':'US',
  cycle_score:70,transition_strength:60,confirmation_score:75,score_change_5d:5,
  cycle_stage:'관찰',asof:'2025-08-29',cycle_metrics:{rs_20d_pct:2,volume_ratio:1.1},
- etf_trend:{signal,bullish_score:50,last_changed:'2025-08-28',asof:'2025-08-29',timeframes:{
+ etf_trend:{signal,bullish_score:50,advanced_bullish_score:50,last_changed:'2025-08-28',asof:'2025-08-29',timeframes:{
  monthly:{state:'up',asof:'2025-07-31',close:120,ma1:120,previous_ma1:108},
  weekly:{state:'down',asof:'2025-08-22'},daily:{state:'mixed',asof:'2025-08-29'}}}});
 test('cycle sections are removed and aggregate traffic light is the first column',()=>{
@@ -78,18 +78,18 @@ test('no green in three complete years is explicit, missing data never claims no
 
 test('weighted theme scores sort descending, show contributions and honor market filter',()=>{
  const {nodes,run}=setup();const low=fixture('한국','yellow'),high=fixture('미국','green');
- low.etf_trend.bullish_score=50;high.etf_trend.bullish_score=100;
+ low.etf_trend.bullish_score=50;high.etf_trend.bullish_score=100;low.etf_trend.advanced_bullish_score=50;high.etf_trend.advanced_bullish_score=100;
  high.etf_trend.timeframes.weekly.state='up';high.etf_trend.timeframes.daily.state='up';
  run('data='+JSON.stringify({themes:[low,high]})+';render()');
  const rows=nodes.get('theme-scores').children;
  assert.ok(rows[0].text.includes('US'));assert.equal(rows[0].children[3].textContent,'100 / 100점');
- assert.ok(rows[0].children[4].text.includes('+50점'));assert.ok(rows[0].children[5].text.includes('+30점'));assert.ok(rows[0].children[6].text.includes('+20점'));
- assert.equal(rows[1].children[3].textContent,'50 / 100점');assert.ok(rows[1].children[5].text.includes('+0점'));
+ assert.ok(rows[0].children[5].text.includes('+50점'));assert.ok(rows[0].children[6].text.includes('+30점'));assert.ok(rows[0].children[7].text.includes('+20점'));
+ assert.equal(rows[1].children[3].textContent,'50 / 100점');assert.ok(rows[1].children[6].text.includes('+0점'));
  run('market="한국";render()');assert.equal(nodes.get('theme-scores').children.length,1);assert.ok(nodes.get('theme-scores').text.includes('KR'));
 });
 test('zero is a real score and unavailable scores are not zero',()=>{
  const {nodes,run}=setup();const zero=fixture('한국','red'),missing=fixture('미국','gray');
- zero.etf_trend.bullish_score=0;missing.etf_trend.bullish_score=null;
+ zero.etf_trend.bullish_score=0;missing.etf_trend.bullish_score=null;zero.etf_trend.advanced_bullish_score=0;missing.etf_trend.advanced_bullish_score=null;
  for(const f of Object.values(zero.etf_trend.timeframes))f.state='down';
  run('data='+JSON.stringify({themes:[missing,zero]})+';render()');
  const rows=nodes.get('theme-scores').children;
@@ -100,11 +100,11 @@ test('zero is a real score and unavailable scores are not zero',()=>{
 });
 
 test('intraday MA1 score takes precedence and completed history remains separate',()=>{
- const {nodes,run}=setup();const x=fixture('한국','red');x.etf_trend.bullish_score=0;x.etf_trend.green_history=historyFixture();
- x.etf_trend.intraday={signal:'yellow',bullish_score:20,asof:'2025-09-01',provisional:true,timeframes:{monthly:{state:'down',ma1:105,previous_ma1:150},weekly:{state:'down',ma1:105,previous_ma1:120},daily:{state:'up',ma1:105,previous_ma1:100}}};
+ const {nodes,run}=setup();const x=fixture('한국','red');x.etf_trend.bullish_score=0;x.etf_trend.advanced_bullish_score=0;x.etf_trend.green_history=historyFixture();
+ x.etf_trend.intraday={signal:'yellow',bullish_score:20,advanced_bullish_score:20,asof:'2025-09-01',provisional:true,timeframes:{monthly:{state:'down',ma1:105,previous_ma1:150},weekly:{state:'down',ma1:105,previous_ma1:120},daily:{state:'up',ma1:105,previous_ma1:100}}};
  run('data='+JSON.stringify({securities_etf:x,themes:[x]})+';render()');
  const row=nodes.get('theme-scores').children[0];assert.equal(row.children[3].textContent,'20 / 100점 (장중·미확정)');
- assert.ok(row.children[6].text.includes('상승 · +20점'));assert.ok(row.children[7].text.includes('2025-09-01'));
+ assert.ok(row.children[7].text.includes('상승 · +20점'));assert.ok(row.children[8].text.includes('2025-09-01'));
  assert.ok(nodes.get('securities-dates').text.includes('장중·미확정'));assert.ok(nodes.get('securities-green-history').text.includes('2025-08-29'));
  assert.ok(!html.includes('MA5'));
 });

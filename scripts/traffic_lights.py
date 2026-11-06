@@ -31,9 +31,30 @@ def bullish_score(signal, timeframes):
     return sum(weight for key, weight in BULLISH_WEIGHTS.items() if timeframes[key]["state"] == "up")
 
 
+def advanced_bullish_score(signal, timeframes):
+    """Strength-sensitive 0-100 score, not a forecast probability.
+
+    Monthly, weekly and daily gains are scaled to 5%, 3% and 1.5%.
+    Negative or flat periods contribute zero; missing data is N/A.
+    """
+    if signal == "gray":
+        return None
+    thresholds = {"monthly": .05, "weekly": .03, "daily": .015}
+    result = 0.
+    for period, weight in BULLISH_WEIGHTS.items():
+        row = timeframes.get(period, {})
+        price, previous = row.get("close"), row.get("previous_ma1")
+        if price is None or previous is None or not np.isfinite(price) or not np.isfinite(previous) or previous <= 0:
+            return None
+        gain = price / previous - 1
+        # Preserve the direction score, but distinguish weak from strong advances.
+        result += weight * float(np.clip(gain / thresholds[period], 0, 1))
+    return round(result, 1)
+
+
 def empty_signal():
     return {"signal": "gray", "last_changed": None, "initial_since": None,
-            "green_history": None, "bullish_score": None, "intraday": None, "method": "MA1",
+            "green_history": None, "bullish_score": None, "advanced_bullish_score": None, "intraday": None, "method": "MA1",
             "asof": None, "transitions": [], "green_performance": None, "green_since": None, "timeframes": {
                 key: {"state": "insufficient", "asof": None, "close": None,
                       "ma1": None, "previous_ma1": None}
@@ -181,10 +202,12 @@ def traffic_light(frame, market, now=None, include_intraday=False):
         if aligned.reindex(completed[-1:]).isna().any():
             live_signal = "gray"
         intraday = {"signal": live_signal, "bullish_score": bullish_score(live_signal, live_snapshots),
+                    "advanced_bullish_score": advanced_bullish_score(live_signal, live_snapshots),
                     "timeframes": live_snapshots, "asof": live_day.date().isoformat(),
                     "provisional": True, "observed_at_utc": now.isoformat()}
     return {"signal": signals.iloc[-1], "timeframes": snapshots, "method": "MA1", "intraday": intraday,
             "bullish_score": bullish_score(signals.iloc[-1], snapshots),
+            "advanced_bullish_score": advanced_bullish_score(signals.iloc[-1], snapshots),
             "asof": completed[-1].date().isoformat(),
             "initial_since": initial.date().isoformat() if initial is not None else None,
             "last_changed": transitions[-1]["date"] if transitions else None,
