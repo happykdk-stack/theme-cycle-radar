@@ -164,6 +164,16 @@ def traffic_light(frame, market, now=None, include_intraday=False):
     signals = pd.Series([combine([histories[k].loc[day] for k in FREQUENCIES])
                          for day in completed], index=completed)
     signals.loc[~recent_valid] = "gray"
+    # Do not display a bullish month/week when the most recent completed
+    # exchange session has no quote. A stale US quote must be N/A, not green.
+    if not bool(recent_valid.iloc[-1]):
+        for key in FREQUENCIES:
+            snapshots[key]["state"] = "insufficient"
+            snapshots[key]["asof"] = None
+            snapshots[key]["close"] = None
+            snapshots[key]["ma1"] = None
+            snapshots[key]["previous_ma1"] = None
+        live_day = None
     valid_signals = signals[signals != "gray"]
     initial = valid_signals.index[0] if len(valid_signals) else None
     # Initial availability is not presented as a historical signal change.

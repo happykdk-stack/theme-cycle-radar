@@ -94,6 +94,16 @@ class TrafficLightTests(unittest.TestCase):
             self.assertIsNone(r['bullish_score'])
             json.dumps(r, allow_nan=False)
 
+    def test_stale_us_lit_quote_never_displays_green_timeframes(self):
+        f = self.frame(end='2025-08-29')
+        stale = f.iloc[:-1]
+        r = traffic_light(stale, '미국', '2025-08-29T21:00Z')
+        self.assertEqual(r['signal'], 'gray')
+        for key in ('monthly', 'weekly', 'daily'):
+            self.assertEqual(r['timeframes'][key]['state'], 'insufficient')
+            self.assertIsNone(r['timeframes'][key]['asof'])
+        self.assertIsNone(r['bullish_score'])
+
     def test_empty_and_short_data(self):
         for f in [pd.DataFrame(), self.frame().tail(4)]:
             self.assertEqual(traffic_light(f,'미국','2025-08-29T21:00Z')['signal'],'gray')
