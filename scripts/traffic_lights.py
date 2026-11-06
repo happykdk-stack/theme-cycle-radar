@@ -5,6 +5,7 @@ import pandas as pd
 import exchange_calendars as xcals
 
 CALENDARS = {"한국": "XKRX", "미국": "XNYS"}
+BULLISH_WEIGHTS = {"monthly": 50, "weekly": 30, "daily": 20}
 FREQUENCIES = {"monthly": "M", "weekly": "W-FRI", "daily": "D"}
 
 
@@ -23,9 +24,16 @@ def combine(states):
     return "yellow"
 
 
+def bullish_score(signal, timeframes):
+    """Weighted trend agreement (0-100 points), not a win probability."""
+    if signal == "gray" or any(timeframes.get(k, {}).get("state") not in ("up", "down", "mixed") for k in BULLISH_WEIGHTS):
+        return None
+    return sum(weight for key, weight in BULLISH_WEIGHTS.items() if timeframes[key]["state"] == "up")
+
+
 def empty_signal():
     return {"signal": "gray", "last_changed": None, "initial_since": None,
-            "green_history": None,
+            "green_history": None, "bullish_score": None,
             "asof": None, "transitions": [], "green_performance": None, "green_since": None, "timeframes": {
                 key: {"state": "insufficient", "asof": None, "close": None,
                       "ma5": None, "previous_ma5": None}
@@ -157,6 +165,7 @@ def traffic_light(frame, market, now=None):
     for key in FREQUENCIES:
         snapshots[key]["provisional"] = key != "daily" and snapshots[key]["asof"] is not None and pd.Timestamp(snapshots[key]["asof"]).to_period(FREQUENCIES[key]) == local_today.to_period(FREQUENCIES[key])
     return {"signal": signals.iloc[-1], "timeframes": snapshots,
+            "bullish_score": bullish_score(signals.iloc[-1], snapshots),
             "asof": completed[-1].date().isoformat(),
             "initial_since": initial.date().isoformat() if initial is not None else None,
             "last_changed": transitions[-1]["date"] if transitions else None,

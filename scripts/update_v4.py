@@ -19,8 +19,6 @@ def detect(df,bench):
     expand=(r5>.012)&(r20>.035)&trend&(vr5>1.05)
     heat=(c/m20>1.18)|(c.pct_change(20)>.2)
     falling=(r5<-.015)&((c<m20)|(r20<r20.shift(5)-.02))
-    watch=((r5>.005)&(r5>r5.shift(3))&(r20>r20.shift(5))&
-           ((vr>1.2)|(vr5>1.1))&(c>m20*.96)&~falling&~heat).fillna(False)
     raw=[]
     for i in range(len(d)):
         if i<65:raw.append("데이터 부족")
@@ -49,15 +47,6 @@ def detect(df,bench):
         if pd.notna(start_close) and pd.notna(end_close) and start_close > 0 and end_close > 0:
             expansion_since = d.index[first].date().isoformat()
             expansion_return_pct = round(float((end_close / start_close - 1) * 100), 2)
-    watch_start=None
-    for i in range(65,len(d)):
-        if bool(watch.iloc[i]) and not bool(watch.iloc[i-1]):
-            watch_start=d.index[i].date().isoformat()
-    reasons=[]
-    if pd.notna(r5.iloc[-1]) and r5.iloc[-1]>.005:reasons.append("5일 상대강도 개선")
-    if pd.notna(vr.iloc[-1]) and vr.iloc[-1]>1.2:reasons.append("당일 거래량 증가")
-    if pd.notna(vr5.iloc[-1]) and vr5.iloc[-1]>1.1:reasons.append("5일 평균 거래량 증가")
-    if pd.notna(r20.iloc[-1]) and pd.notna(r20.shift(5).iloc[-1]) and r20.iloc[-1]>r20.shift(5).iloc[-1]:reasons.append("20일 상대강도 가속")
     rs_score=float(np.clip(50+400*(r20.iloc[-1] if pd.notna(r20.iloc[-1]) else 0),0,100))
     vol_score=float(np.clip(50+35*np.log2(max(float(vr.iloc[-1]),.01)),0,100)) if pd.notna(vr.iloc[-1]) else 50.
     momentum=float(np.clip(50+600*(r5.iloc[-1] if pd.notna(r5.iloc[-1]) else 0),0,100))
@@ -97,7 +86,6 @@ def detect(df,bench):
             "strength_since":strength_since,"strength_return_pct":strength_return_pct,
             "score_change_5d":delta,"transition_strength":round(float(np.clip(50+2*(delta or 0),0,100)),1) if delta is not None else None,
             "confirmation_score":confirmation,
-            "watch_active":bool(watch.iloc[-1]),"watch_first_seen":watch_start,"watch_reasons":reasons,
             "cycle_last_transition":changes[-1]["date"] if changes else None,
             "cycle_previous_stage":changes[-1]["from"] if changes else None,
             "cycle_transitions":changes[-30:],
@@ -142,7 +130,7 @@ def build_v4(fetch=series_download, now=None):
         for rank,t in enumerate(group,1):t["market_rank"]=rank
     result["version"]="4.2"
     result["etf_trend_version"]="1.0"
-    result["limitations"].extend(["조기 징후는 당일 미확정 신호이고, 단계 전환은 연속 2거래일 확인입니다.","사이클 단계는 ETF 가격·거래량 대용지표 기반 추정이며 기관 자금 흐름이 아닙니다.",
+    result["limitations"].extend(["신호등 상승 점수는 월봉 상승 50점 + 주봉 상승 30점 + 일봉 상승 20점이며, 혼재·보합과 하락은 0점입니다. 데이터 부족 시 미산출하며 실제 상승 확률이 아닙니다.","사이클 단계는 ETF 가격·거래량 대용지표 기반 추정이며 기관 자금 흐름이 아닙니다.",
         "단계 전환은 연속 2거래일 확인 후 기록됩니다. 점수는 예측 확률이 아닙니다.",
         "실제 구성종목 동반 상승 및 기관·외국인 순매수는 미포함입니다.",
         "ETF 신호등은 거래소 최신 완료 거래일을 사용하며 진행 중인 월봉·주봉도 포함합니다. 상승=종가>MA5 및 MA5 상승, 하락=종가<MA5 및 MA5 하락, 그 외=혼재·보합입니다.",

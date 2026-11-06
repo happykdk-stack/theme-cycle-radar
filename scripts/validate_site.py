@@ -1,6 +1,7 @@
 """Fail before publishing a malformed dashboard data file."""
 import json
 import os
+from traffic_lights import bullish_score
 from pathlib import Path
 
 site = Path(__file__).resolve().parents[1] / 'site'
@@ -13,6 +14,7 @@ assert data['securities_etf']['ticker'] == '102970.KS'
 for theme in [*data['themes'], data['securities_etf']]:
     trend = theme['etf_trend']
     assert trend['signal'] in ('green', 'yellow', 'red', 'gray')
+    assert trend['bullish_score'] == bullish_score(trend['signal'], trend['timeframes'])
     assert set(trend['timeframes']) == {'monthly', 'weekly', 'daily'}
     for f in trend['timeframes'].values():
         assert f['state'] in ('up', 'down', 'mixed', 'insufficient')

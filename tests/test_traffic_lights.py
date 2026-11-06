@@ -30,6 +30,7 @@ class TrafficLightTests(unittest.TestCase):
             with self.subTest(direction=direction):
                 r = traffic_light(self.frame(direction=direction), '미국', '2025-08-29T21:00Z')
                 self.assertEqual(r['signal'], color)
+                self.assertEqual(r['bullish_score'], 100 if direction == 1 else 0)
                 self.assertEqual(r['timeframes']['monthly']['asof'], '2025-08-29')
                 json.dumps(r, allow_nan=False)
 
@@ -90,6 +91,7 @@ class TrafficLightTests(unittest.TestCase):
         for broken in [f.iloc[:-1], f.drop(f.index[-3]), f.assign(Close=np.nan), f.assign(Close=np.inf)]:
             r = traffic_light(broken, '미국', '2025-08-29T21:00Z')
             self.assertEqual(r['signal'], 'gray')
+            self.assertIsNone(r['bullish_score'])
             json.dumps(r, allow_nan=False)
 
     def test_empty_and_short_data(self):
