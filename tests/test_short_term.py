@@ -17,6 +17,18 @@ class ShortTermTests(unittest.TestCase):
                           "Volume":np.full(12,100.)},index=idx)
         self.assertEqual(evaluate(f)["status"], "관찰")
 
+    def test_low_breach_triggers_even_if_close_recovers(self):
+        idx = pd.to_datetime(["2026-11-05 15:30","2026-11-06 15:30"]).tz_localize("Asia/Seoul")
+        f = pd.DataFrame({"Open":[100.,95.],"High":[100.,98.],
+                          "Low":[100.,90.],"Close":[100.,97.],
+                          "Volume":[100.,100.]},index=idx)
+        def fetch(symbol, interval, period):
+            if symbol == "^KS11":return f
+            raise ValueError("5분봉 미제공")
+        result=build(now="2026-11-06T07:00:00Z",fetch=fetch)
+        self.assertEqual(result["status"],"급락 조건 충족")
+        self.assertEqual(result["drop_pct"],-10.0)
+
     def test_market_gate(self):
         idx = pd.to_datetime(["2026-11-05 15:30","2026-11-06 15:30"]).tz_localize("Asia/Seoul")
         f = pd.DataFrame({"Open":[100.,95.],"High":[100.,95.],

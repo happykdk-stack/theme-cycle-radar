@@ -61,7 +61,7 @@ def build(now=None, fetch=download):
         now = now.tz_localize("UTC")
     local = now.tz_convert("Asia/Seoul")
     result = {"generated_at_utc": now.isoformat(), "threshold_pct": CRASH_THRESHOLD,
-              "market": "KOSPI", "status": "N/A", "drop_pct": None,
+              "market": "KOSPI", "status": "N/A", "drop_pct": None, "trigger_basis": "daily_low_vs_previous_close",
               "trigger_date": None, "candidates": [], "errors": [],
               "note": "5분봉은 지연될 수 있으며 주문 실행 신호가 아닙니다."}
     try:
@@ -81,7 +81,7 @@ def build(now=None, fetch=download):
             raise ValueError("코스피 비교 종가 부족")
         if previous is None or previous["Close"] <= 0:
             raise ValueError("전일 종가 없음")
-        change = (float(current["Close"]) / float(previous["Close"]) - 1) * 100
+        change = (float(current["Low"]) / float(previous["Close"]) - 1) * 100
         result["drop_pct"] = round(change, 2)
         result["trigger_date"] = current.name.date().isoformat()
         if change > CRASH_THRESHOLD:

@@ -11,7 +11,7 @@
 <section class="panel"><h2>테마별 신호등 상승 점수</h2><p class="muted small">월·주·일 상승폭을 각각 5%·3%·1.5% 기준으로 정규화하고 50·30·20점으로 가중 합산합니다. 기존 방향 일치 점수는 별도 표시합니다. 추세의 일치도를 나타내는 점수이며 실제 상승 확률(%)은 아닙니다. MA1(현재 가격)을 직전 월말·주말·거래일 종가와 비교합니다. 장중 점수는 수집 시점의 미확정 값이며 실시간 자동 갱신은 아닙니다. 0점은 세 기간 모두 상승 조건을 충족하지 못했다는 뜻입니다. 현재 가격이 직전 기간 종가보다 높으면 상승, 낮으면 하락, 같으면 보합입니다. 데이터가 부족하면 점수를 산출하지 않습니다.</p><div class="tablewrap"><table><thead><tr><th>종합 신호등</th><th>시장</th><th>테마 ETF</th><th>상승 강도 점수</th><th>방향 일치 점수</th><th>월봉 · 50점</th><th>주봉 · 30점</th><th>일봉 · 20점</th><th>판정 기준일</th></tr></thead><tbody id="theme-scores"></tbody></table></div></section>
 </div>
 <div id="short-view" hidden>
-<section class="panel"><h2>코스피 -9% 급락 후 5분봉 반등 탐지</h2><p class="muted small">전일 종가 대비 코스피 -9% 이하일 때만 활성화됩니다. 완료된 5분봉 기준 최근 12봉 저점 대비 1% 반등, MA5 &gt; MA10, 직전봉 대비 상승, 직전 10봉 평균 대비 거래량 1.5배를 모두 만족하면 '반등 확인'입니다. 연구용이며 매매 권유가 아닙니다.</p><div id="short-status" class="panel">단기 데이터를 불러오는 중입니다.</div><div class="tablewrap"><table><thead><tr><th>ETF</th><th>5분봉 상태</th><th>저점 반등률</th><th>거래량 배수</th><th>기준시각</th></tr></thead><tbody id="short-rows"></tbody></table></div><p id="short-errors" class="small muted"></p></section>
+<section class="panel"><h2>코스피 -9% 급락 후 5분봉 반등 탐지</h2><p class="muted small">전일 종가 대비 코스피 당일 최저가가 -9% 이하를 기록하면 활성화됩니다. 완료된 5분봉 기준 최근 12봉 저점 대비 1% 반등, MA5 &gt; MA10, 직전봉 대비 상승, 직전 10봉 평균 대비 거래량 1.5배를 모두 만족하면 '반등 확인'입니다. 연구용이며 매매 권유가 아닙니다.</p><div id="short-status" class="panel">단기 데이터를 불러오는 중입니다.</div><div class="tablewrap"><table><thead><tr><th>ETF</th><th>5분봉 상태</th><th>저점 반등률</th><th>거래량 배수</th><th>기준시각</th></tr></thead><tbody id="short-rows"></tbody></table></div><p id="short-errors" class="small muted"></p></section>
 </div>
 <section class="panel" id="long-errors"><h2>데이터 수집 오류 및 한계</h2><div id="errors" class="small muted"></div><ul id="limitations" class="small muted"></ul></section><footer>연구용 ETF 테마 추정 모델. 실시간 데이터나 투자 추천이 아닙니다.</footer></main>
 <script>
@@ -77,7 +77,7 @@ function render(){if(!data)return;renderSecurities();const a=data.themes.filter(
 $('errors').replaceChildren();for(const e of data.errors||[])$('errors').append(elem('div',e.ticker+': '+e.message));if(!data.errors?.length)$('errors').textContent='보고된 수집 오류 없음';$('limitations').replaceChildren(...(data.limitations||[]).filter(x=>!['사이클','단계','수급 점수','테마 내 확산','과거 신호 수익률','점수 가중치'].some(word=>x.includes(word))).map(x=>elem('li',x)))}
 function renderShort(){
  const d=shortData;if(!d)return;
- $('short-status').textContent='코스피 '+(d.drop_pct==null?'N/A':d.drop_pct+'%')+' · '+d.status+' · 기준일 '+(d.trigger_date||'N/A');
+ $('short-status').textContent='코스피 당일 최저가 등락률 '+(d.drop_pct==null?'N/A':d.drop_pct+'%')+' · '+d.status+' · 기준일 '+(d.trigger_date||'N/A');
  const tbody=$('short-rows');tbody.replaceChildren();
  for(const x of d.candidates||[]){const tr=elem('tr');[x.name+' · '+x.ticker,x.status,x.bounce_pct==null?'N/A':x.bounce_pct+'%',x.volume_multiple==null?'N/A':x.volume_multiple+'배',x.asof||'N/A'].forEach(v=>cell(tr,v));tbody.append(tr)}
  if(!d.candidates?.length){const tr=elem('tr'),td=elem('td','현재 조건에 해당하는 5분봉 후보 없음');td.colSpan=5;tr.append(td);tbody.append(tr)}

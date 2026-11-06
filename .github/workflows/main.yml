@@ -8,6 +8,8 @@ on:
   workflow_dispatch:
   schedule:
     - cron: '30 9 * * 1-5'
+    # Korea market hours, UTC 00:00-06:30; GitHub schedules may be delayed.
+    - cron: '*/10 0-6 * * 1-5'
     - cron: '30 22 * * 1-5'
 
 permissions:
