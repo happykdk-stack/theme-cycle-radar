@@ -25,12 +25,11 @@ class GreenHistoryTests(unittest.TestCase):
             states = []
             for frequency in ('M', 'W-FRI', 'D'):
                 bars = f.Close.loc[:day].groupby(f.loc[:day].index.to_period(frequency)).last()
-                ma = bars.rolling(5).mean()
-                if len(bars) < 6 or pd.isna(ma.iloc[-2]):
+                if len(bars) < 2:
                     states.append('insufficient')
-                elif bars.iloc[-1] > ma.iloc[-1] > ma.iloc[-2]:
+                elif bars.iloc[-1] > bars.iloc[-2]:
                     states.append('up')
-                elif bars.iloc[-1] < ma.iloc[-1] < ma.iloc[-2]:
+                elif bars.iloc[-1] < bars.iloc[-2]:
                     states.append('down')
                 else:
                     states.append('mixed')

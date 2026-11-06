@@ -1,4 +1,4 @@
-"""ETF trend signals including the latest completed session of open periods."""
+"""MA1 price-direction signals, with separate provisional intraday snapshots."""
 from functools import lru_cache
 import numpy as np
 import pandas as pd
@@ -33,10 +33,10 @@ def bullish_score(signal, timeframes):
 
 def empty_signal():
     return {"signal": "gray", "last_changed": None, "initial_since": None,
-            "green_history": None, "bullish_score": None,
+            "green_history": None, "bullish_score": None, "intraday": None, "method": "MA1",
             "asof": None, "transitions": [], "green_performance": None, "green_since": None, "timeframes": {
                 key: {"state": "insufficient", "asof": None, "close": None,
-                      "ma5": None, "previous_ma5": None}
+                      "ma1": None, "previous_ma1": None}
                 for key in FREQUENCIES}}
 
 
@@ -68,7 +68,7 @@ def green_history(signals):
             "latest_run": latest, "runs": runs}
 
 
-def traffic_light(frame, market, now=None):
+def traffic_light(frame, market, now=None, include_intraday=False):
     now = pd.Timestamp.now(tz="UTC") if now is None else pd.Timestamp(now)
     if now.tzinfo is None:
         raise ValueError("now must have a timezone")
@@ -101,9 +101,13 @@ def traffic_light(frame, market, now=None):
     aligned = close.reindex(sessions)
     # Missing recent sessions invalidate the live signal rather than silently
     # treating an older quote as the current week/month's latest price.
-    recent_valid = aligned.reindex(completed).notna().rolling(5, min_periods=1).sum()
-    recent_valid = recent_valid == np.minimum(np.arange(len(completed)) + 1, 5)
-    histories, snapshots = {}, {}
+    recent_valid = aligned.reindex(completed).notna().rolling(2, min_periods=1).sum()
+    recent_valid = recent_valid == np.minimum(np.arange(len(completed)) + 1, 2)
+    histories, snapshots, live_snapshots = {}, {}, {}
+    open_times = pd.Series(pd.to_datetime(schedule["open"], utc=True).array, index=sessions)
+    live_day = local_today if (include_intraday and local_today in sessions
+                and open_times.loc[local_today] <= now < close_times.loc[local_today]
+                and pd.notna(aligned.loc[local_today])) else None
     for key, frequency in FREQUENCIES.items():
         periods = completed.to_period(frequency)
         # Final closes are used ONLY through shifted prior-period aggregates.
@@ -114,21 +118,28 @@ def traffic_light(frame, market, now=None):
         full = pd.Series([group.index[0] >= close.index[0] for _, group in groups], index=finals.index)
         finals = finals.where(full)
         bars = aligned.reindex(completed).where(full.reindex(periods).to_numpy())
-        prior_four = finals.shift(1).rolling(4, min_periods=4).sum()
-        prior_five = finals.shift(1).rolling(5, min_periods=5).mean()
-        ma = (bars + prior_four.reindex(periods).to_numpy()) / 5
-        previous = pd.Series(prior_five.reindex(periods).to_numpy(), index=completed)
-        valid = bars.notna() & ma.notna() & previous.notna()
+        # MA1 is the price itself: compare with the prior period's final price.
+        prior = finals.shift(1)
+        previous = pd.Series(prior.reindex(periods).to_numpy(), index=completed)
+        valid = bars.notna() & previous.notna()
         states = pd.Series("insufficient", index=bars.index)
         states.loc[valid] = "mixed"
-        states.loc[valid & (bars > ma) & (ma > previous)] = "up"
-        states.loc[valid & (bars < ma) & (ma < previous)] = "down"
+        states.loc[valid & (bars > previous)] = "up"
+        states.loc[valid & (bars < previous)] = "down"
         histories[key] = states
         def number(series):
             return float(series.iloc[-1]) if len(series) and pd.notna(series.iloc[-1]) else None
         snapshots[key] = {"state": states.iloc[-1] if len(states) else "insufficient",
                           "asof": bars.index[-1].date().isoformat() if len(bars) else None,
-                          "close": number(bars), "ma5": number(ma), "previous_ma5": number(previous)}
+                          "close": number(bars), "ma1": number(bars), "previous_ma1": number(previous)}
+        if live_day is not None:
+            period = live_day.to_period(frequency)
+            price, base = aligned.loc[live_day], prior.loc[period]
+            state = "insufficient" if pd.isna(base) or not full.loc[period] else "up" if price > base else "down" if price < base else "mixed"
+            live_snapshots[key] = {"state": state, "asof": live_day.date().isoformat(),
+                                   "close": float(price), "ma1": float(price),
+                                   "previous_ma1": float(base) if pd.notna(base) else None,
+                                   "provisional": True}
     signals = pd.Series([combine([histories[k].loc[day] for k in FREQUENCIES])
                          for day in completed], index=completed)
     signals.loc[~recent_valid] = "gray"
@@ -164,7 +175,15 @@ def traffic_light(frame, market, now=None):
             }
     for key in FREQUENCIES:
         snapshots[key]["provisional"] = key != "daily" and snapshots[key]["asof"] is not None and pd.Timestamp(snapshots[key]["asof"]).to_period(FREQUENCIES[key]) == local_today.to_period(FREQUENCIES[key])
-    return {"signal": signals.iloc[-1], "timeframes": snapshots,
+    intraday = None
+    if live_day is not None:
+        live_signal = combine([live_snapshots[k]["state"] for k in FREQUENCIES])
+        if aligned.reindex(completed[-1:]).isna().any():
+            live_signal = "gray"
+        intraday = {"signal": live_signal, "bullish_score": bullish_score(live_signal, live_snapshots),
+                    "timeframes": live_snapshots, "asof": live_day.date().isoformat(),
+                    "provisional": True, "observed_at_utc": now.isoformat()}
+    return {"signal": signals.iloc[-1], "timeframes": snapshots, "method": "MA1", "intraday": intraday,
             "bullish_score": bullish_score(signals.iloc[-1], snapshots),
             "asof": completed[-1].date().isoformat(),
             "initial_since": initial.date().isoformat() if initial is not None else None,

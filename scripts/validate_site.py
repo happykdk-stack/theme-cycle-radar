@@ -13,6 +13,15 @@ assert data['themes']
 assert data['securities_etf']['ticker'] == '102970.KS'
 for theme in [*data['themes'], data['securities_etf']]:
     trend = theme['etf_trend']
+    assert trend['method'] == 'MA1'
+    live = trend['intraday']
+    if live is not None:
+        assert live['provisional'] is True
+        assert live['asof'] > trend['asof']
+        assert live['bullish_score'] == bullish_score(live['signal'], live['timeframes'])
+        assert set(live['timeframes']) == {'monthly', 'weekly', 'daily'}
+        for f in live['timeframes'].values():
+            assert f['asof'] == live['asof'] and f['provisional'] is True
     assert trend['signal'] in ('green', 'yellow', 'red', 'gray')
     assert trend['bullish_score'] == bullish_score(trend['signal'], trend['timeframes'])
     assert set(trend['timeframes']) == {'monthly', 'weekly', 'daily'}

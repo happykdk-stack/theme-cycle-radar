@@ -26,7 +26,7 @@ const fixture=(market,signal)=>({market,theme:'테스트',ticker:market==='한�
  cycle_score:70,transition_strength:60,confirmation_score:75,score_change_5d:5,
  cycle_stage:'관찰',asof:'2025-08-29',cycle_metrics:{rs_20d_pct:2,volume_ratio:1.1},
  etf_trend:{signal,bullish_score:50,last_changed:'2025-08-28',asof:'2025-08-29',timeframes:{
- monthly:{state:'up',asof:'2025-07-31',close:120,ma5:110,previous_ma5:108},
+ monthly:{state:'up',asof:'2025-07-31',close:120,ma1:120,previous_ma1:108},
  weekly:{state:'down',asof:'2025-08-22'},daily:{state:'mixed',asof:'2025-08-29'}}}});
 test('cycle sections are removed and aggregate traffic light is the first column',()=>{
  const {nodes,run}=setup();run('data='+JSON.stringify({themes:[fixture('한국','yellow')]})+';render()');
@@ -34,7 +34,7 @@ test('cycle sections are removed and aggregate traffic light is the first column
  assert.ok(html.includes('<tr><th>종합 신호등</th><th>시장</th><th>테마 ETF</th>'));
  assert.ok(nodes.get('theme-scores').children[0].children[0].text.includes('노랑'));
  assert.ok(nodes.get('theme-scores').children[0].children[3].text.includes('판정 근거'));
- assert.ok(nodes.get('theme-scores').children[0].children[3].text.includes('종가 120'));
+ assert.ok(nodes.get('theme-scores').children[0].children[3].text.includes('현재가(MA1) 120'));
 });
 test('securities ETF is first panel and remains visible for every market filter',()=>{
  const {nodes,run}=setup();
@@ -44,7 +44,7 @@ test('securities ETF is first panel and remains visible for every market filter'
  assert.ok(nodes.get('securities-signal').text.includes('초록 · 3개 상승'));
  assert.equal(nodes.get('securities-frames').children.length,3);
  assert.ok(nodes.get('securities-dates').text.includes('2025-08-28'));
- assert.ok(nodes.get('securities-frames').text.includes('MA5 110'));
+ assert.ok(nodes.get('securities-frames').text.includes('직전 기간 종가 108'));
 });
 test('missing securities ETF data stays gray rather than using theme signals',()=>{
  const {nodes,run}=setup();run('data={themes:[]};render()');
@@ -97,4 +97,14 @@ test('zero is a real score and unavailable scores are not zero',()=>{
  assert.ok(!rows[1].text.includes('+50점'));
  assert.ok(!html.includes('새로운 사이클'));assert.ok(!html.includes('조기 징후'));assert.ok(!html.includes('watch_active'));assert.ok(!html.includes('id="top"'));
  assert.ok(html.includes('실제 상승 확률(%)은 아닙니다'));
+});
+
+test('intraday MA1 score takes precedence and completed history remains separate',()=>{
+ const {nodes,run}=setup();const x=fixture('한국','red');x.etf_trend.bullish_score=0;x.etf_trend.green_history=historyFixture();
+ x.etf_trend.intraday={signal:'yellow',bullish_score:20,asof:'2025-09-01',provisional:true,timeframes:{monthly:{state:'down',ma1:105,previous_ma1:150},weekly:{state:'down',ma1:105,previous_ma1:120},daily:{state:'up',ma1:105,previous_ma1:100}}};
+ run('data='+JSON.stringify({securities_etf:x,themes:[x]})+';render()');
+ const row=nodes.get('theme-scores').children[0];assert.equal(row.children[3].textContent,'20 / 100점 (장중·미확정)');
+ assert.ok(row.children[6].text.includes('상승 · +20점'));assert.ok(row.children[7].text.includes('2025-09-01'));
+ assert.ok(nodes.get('securities-dates').text.includes('장중·미확정'));assert.ok(nodes.get('securities-green-history').text.includes('2025-08-29'));
+ assert.ok(!html.includes('MA5'));
 });

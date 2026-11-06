@@ -96,7 +96,7 @@ def build_v4(fetch=series_download, now=None):
     cache={}
     def cached(t):
         if t not in cache:
-            # Three years of history need six monthly bars of warm-up.
+            # Three years of history need prior monthly bar for comparison.
             cache[t] = fetch(t, period='5y') if fetch is series_download and t == SECURITIES_ETF['ticker'] else fetch(t)
         return cache[t]
     result=build(cached)
@@ -105,7 +105,7 @@ def build_v4(fetch=series_download, now=None):
     except Exception as exc:
         result["errors"].append({"ticker":guide["ticker"],"message":"Securities ETF: "+str(exc)[:160]})
     else:
-        try:guide["etf_trend"]=traffic_light(guide_frame,guide["market"],now=now or result["generated_at_utc"])
+        try:guide["etf_trend"]=traffic_light(guide_frame,guide["market"],now=now or result["generated_at_utc"],include_intraday=True)
         except Exception as exc:
             result["errors"].append({"ticker":guide["ticker"],"message":"ETF trend calculation: "+str(exc)[:160]})
     result["securities_etf"]=guide
@@ -120,7 +120,7 @@ def build_v4(fetch=series_download, now=None):
         except Exception as exc:
             result["errors"].append({"ticker":t["ticker"],"message":"ETF trend: "+str(exc)[:160]})
         else:
-            try:t["etf_trend"]=traffic_light(frame,t["market"],now=now or result["generated_at_utc"])
+            try:t["etf_trend"]=traffic_light(frame,t["market"],now=now or result["generated_at_utc"],include_intraday=True)
             except Exception as exc:
                 result["errors"].append({"ticker":t["ticker"],"message":"ETF trend calculation: "+str(exc)[:160]})
         try:t.update(detect(cached(t["ticker"]),cached(BENCHMARK[t["market"]])))
@@ -133,8 +133,8 @@ def build_v4(fetch=series_download, now=None):
     result["limitations"].extend(["신호등 상승 점수는 월봉 상승 50점 + 주봉 상승 30점 + 일봉 상승 20점이며, 혼재·보합과 하락은 0점입니다. 데이터 부족 시 미산출하며 실제 상승 확률이 아닙니다.","사이클 단계는 ETF 가격·거래량 대용지표 기반 추정이며 기관 자금 흐름이 아닙니다.",
         "단계 전환은 연속 2거래일 확인 후 기록됩니다. 점수는 예측 확률이 아닙니다.",
         "실제 구성종목 동반 상승 및 기관·외국인 순매수는 미포함입니다.",
-        "ETF 신호등은 거래소 최신 완료 거래일을 사용하며 진행 중인 월봉·주봉도 포함합니다. 상승=종가>MA5 및 MA5 상승, 하락=종가<MA5 및 MA5 하락, 그 외=혼재·보합입니다.",
-        "종합 초록=월·주·일 모두 상승, 빨강=모두 하락, 노랑=혼재·보합, 회색=한 시간대라도 데이터 부족. MA5 방향 비교에는 최소 6개 기간의 관측값이 필요합니다.",
+        "ETF 신호등은 MA1 가격 방향을 사용합니다. 장중 시세가 있으면 미확정 점수로 별도 표시하며, 과거 이력은 완료 거래일만 사용합니다. 상승=현재 MA1(가격)>직전 기간 종가, 하락=현재 MA1(가격)<직전 기간 종가, 그 외=혼재·보합입니다.",
+        "종합 초록=월·주·일 모두 상승, 빨강=모두 하락, 노랑=혼재·보합, 회색=한 시간대라도 데이터 부족. MA1 방향은 해당 기간 가격과 직전 기간 종가를 비교합니다. 같으면 보합입니다.",
         "최근 신호 변경일과 초록 구간은 각 과거 거래일 당시 진행 중인 월·주봉을 포함해 ETF 종합 색상을 재계산합니다. 최초 산출은 변경으로 세지 않으며 공급자 과거 수정에 따라 달라질 수 있습니다."])
     if result["errors"] and result["status"]=="ok":result["status"]="partial"
     return result

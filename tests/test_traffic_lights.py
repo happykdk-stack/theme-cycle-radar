@@ -79,16 +79,16 @@ class TrafficLightTests(unittest.TestCase):
         self.assertEqual(r['timeframes']['weekly']['asof'], '2025-04-30')
         self.assertEqual(r['timeframes']['monthly']['asof'], '2025-04-30')
 
-    def test_six_months_required_and_partial_first_month_excluded(self):
-        f = self.frame(end='2025-06-30')
-        self.assertEqual(traffic_light(f,'미국','2025-06-30T21:00Z')['signal'], 'green')
-        r = traffic_light(f.iloc[1:], '미국', '2025-06-30T21:00Z')
-        self.assertEqual(r['signal'], 'gray')
+    def test_two_months_required_and_partial_first_month_excluded(self):
+        f = self.frame(end='2025-02-28')
+        self.assertEqual(traffic_light(f,'미국','2025-01-31T22:00Z')['signal'], 'gray')
+        self.assertEqual(traffic_light(f,'미국','2025-02-28T22:00Z')['signal'], 'green')
+        r = traffic_light(f.iloc[1:], '미국', '2025-02-28T22:00Z')
         self.assertEqual(r['timeframes']['monthly']['state'], 'insufficient')
 
     def test_missing_and_stale_data_are_gray(self):
         f = self.frame()
-        for broken in [f.iloc[:-1], f.drop(f.index[-3]), f.assign(Close=np.nan), f.assign(Close=np.inf)]:
+        for broken in [f.iloc[:-1], f.drop(f.index[-2]), f.assign(Close=np.nan), f.assign(Close=np.inf)]:
             r = traffic_light(broken, '미국', '2025-08-29T21:00Z')
             self.assertEqual(r['signal'], 'gray')
             self.assertIsNone(r['bullish_score'])
@@ -122,20 +122,22 @@ class TrafficLightTests(unittest.TestCase):
         f = self.frame(end='2025-09-05')
         f.loc['2025-09-02':, 'Close'] = 100.
         r = traffic_light(f,'미국','2025-09-05T21:00Z')
-        self.assertEqual(r['signal'], 'red')
-        self.assertEqual(r['last_changed'], '2025-09-02')
+        self.assertEqual(r['signal'], 'yellow')
+        self.assertEqual(r['last_changed'], '2025-09-03')
         prior = traffic_light(f,'미국','2025-08-29T21:00Z')
         self.assertEqual(prior['signal'], 'green')
         self.assertIsNone(prior['last_changed'])
         self.assertTrue(all(e['date'] <= r['asof'] for e in r['transitions']))
 
-    def test_price_and_ma_direction_disagreement_is_mixed(self):
+    def test_ma1_uses_only_prior_price_not_ma5(self):
         f = self.frame()
-        # Latest close below MA5, but higher than six bars ago: MA5 still rises.
-        f.iloc[-6:, f.columns.get_loc('Close')] = [100, 110, 110, 110, 110, 105]
+        f.iloc[-6:, f.columns.get_loc('Close')] = [200, 190, 180, 170, 100, 105]
         r = traffic_light(f,'미국','2025-08-29T21:00Z')
-        self.assertEqual(r['timeframes']['daily']['state'], 'mixed')
-        self.assertEqual(r['signal'], 'yellow')
+        daily = r['timeframes']['daily']
+        self.assertEqual(daily['state'], 'up')
+        self.assertEqual(daily['ma1'], 105)
+        self.assertEqual(daily['previous_ma1'], 100)
+        self.assertNotIn('ma5', daily)
 
     def test_build_preserves_all_v42_metrics(self):
         f = self.frame()
