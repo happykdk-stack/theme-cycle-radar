@@ -34,7 +34,7 @@ test('cycle sections are removed and aggregate traffic light is the first column
  assert.ok(html.includes('<tr><th>종합 신호등</th><th>시장</th><th>테마 ETF</th>'));
  assert.ok(nodes.get('theme-scores').children[0].children[0].text.includes('노랑'));
  assert.ok(nodes.get('theme-scores').children[0].children[3].text.includes('판정 근거'));
- assert.ok(nodes.get('theme-scores').children[0].children[3].text.includes('현재가(MA1) 120'));
+ assert.ok(nodes.get('theme-scores').children[0].children[3].text.includes('실제 종가 120'));
 });
 test('securities ETF is first panel and remains visible for every market filter',()=>{
  const {nodes,run}=setup();
@@ -44,7 +44,7 @@ test('securities ETF is first panel and remains visible for every market filter'
  assert.ok(nodes.get('securities-signal').text.includes('초록 · 3개 상승'));
  assert.equal(nodes.get('securities-frames').children.length,3);
  assert.ok(nodes.get('securities-dates').text.includes('2025-08-28'));
- assert.ok(nodes.get('securities-frames').text.includes('직전 기간 종가 108'));
+ assert.ok(nodes.get('securities-frames').text.includes('HA 종가 —'));
 });
 test('missing securities ETF data stays gray rather than using theme signals',()=>{
  const {nodes,run}=setup();run('data={themes:[]};render()');

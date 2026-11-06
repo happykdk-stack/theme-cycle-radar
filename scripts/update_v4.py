@@ -3,6 +3,7 @@ import numpy as np
 import pandas as pd
 from update import OUT, BENCHMARK, THEMES, series_download, build
 from traffic_lights import traffic_light, empty_signal
+from heikin_ashi import ha_traffic_light
 
 SECURITIES_ETF = {"market":"한국", "ticker":"102970.KS", "fund":"KODEX 증권"}
 
@@ -105,7 +106,7 @@ def build_v4(fetch=series_download, now=None):
     except Exception as exc:
         result["errors"].append({"ticker":guide["ticker"],"message":"Securities ETF: "+str(exc)[:160]})
     else:
-        try:guide["etf_trend"]=traffic_light(guide_frame,guide["market"],now=now or result["generated_at_utc"],include_intraday=True)
+        try:guide["etf_trend"]=ha_traffic_light(guide_frame,guide["market"],now=now or result["generated_at_utc"],include_intraday=True)
         except Exception as exc:
             result["errors"].append({"ticker":guide["ticker"],"message":"ETF trend calculation: "+str(exc)[:160]})
     result["securities_etf"]=guide
@@ -120,7 +121,7 @@ def build_v4(fetch=series_download, now=None):
         except Exception as exc:
             result["errors"].append({"ticker":t["ticker"],"message":"ETF trend: "+str(exc)[:160]})
         else:
-            try:t["etf_trend"]=traffic_light(frame,t["market"],now=now or result["generated_at_utc"],include_intraday=True)
+            try:t["etf_trend"]=ha_traffic_light(frame,t["market"],now=now or result["generated_at_utc"],include_intraday=True)
             except Exception as exc:
                 result["errors"].append({"ticker":t["ticker"],"message":"ETF trend calculation: "+str(exc)[:160]})
         try:t.update(detect(cached(t["ticker"]),cached(BENCHMARK[t["market"]])))

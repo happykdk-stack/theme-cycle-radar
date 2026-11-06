@@ -5,6 +5,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import yfinance as yf
+from heikin_ashi import ha_candles
 
 ROOT = Path(__file__).resolve().parents[1]
 OUTPUT = ROOT / "site" / "short_term.json"
@@ -37,20 +38,21 @@ def evaluate(bars):
     """Only completed five-minute candles; no future-bar lookahead."""
     if len(bars) < 12:
         return {"status": "N/A", "reason": "완료된 5분봉 12개 미만"}
+    ha = ha_candles(bars[["Open", "High", "Low", "Close"]])
     c = bars["Close"].astype(float)
     low = bars["Low"].astype(float)
     vol = bars["Volume"].astype(float)
-    ma5 = c.rolling(5).mean()
-    ma10 = c.rolling(10).mean()
+    ha_open, ha_close = ha["Open"], ha["Close"]
     prior_volume = vol.iloc[-11:-1].mean()
     bounce = c.iloc[-1] >= low.iloc[-12:].min() * 1.01
-    trend = c.iloc[-1] > ma5.iloc[-1] > ma10.iloc[-1]
-    recovery = c.iloc[-1] > c.iloc[-2]
+    trend = ha_close.iloc[-1] > ha_open.iloc[-1] and all(
+        ha_close.iloc[-i] > ha_open.iloc[-i] for i in (1, 2))
+    recovery = ha_close.iloc[-1] > ha_close.iloc[-2]
     volume = prior_volume > 0 and vol.iloc[-1] >= 1.5 * prior_volume
     confirmed = bool(bounce and trend and recovery and volume)
     return {"status": "반등 확인" if confirmed else "관찰",
             "bounce_pct": round(float((c.iloc[-1] / low.iloc[-12:].min() - 1) * 100), 2),
-            "above_ma": bool(trend), "rising": bool(recovery), "volume_confirmed": bool(volume),
+            "ha_up_two_bars": bool(trend), "rising": bool(recovery), "volume_confirmed": bool(volume),
             "volume_multiple": round(float(vol.iloc[-1] / prior_volume), 2) if prior_volume > 0 else None,
             "close": round(float(c.iloc[-1]), 2),
             "asof": bars.index[-1].isoformat()}

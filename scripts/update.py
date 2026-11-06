@@ -44,7 +44,7 @@ def series_download(symbol, period='18mo'):
             raise ValueError('가격 데이터 없음 (다운로드 및 개별 조회 모두 빈 응답)')
     if isinstance(frame.columns, pd.MultiIndex):
         frame.columns = frame.columns.get_level_values(0)
-    frame = frame[['Open','Close','Volume']].copy().dropna(subset=['Open','Close','Volume'])
+    frame = frame[['Open','High','Low','Close','Volume']].copy().dropna(subset=['Open','High','Low','Close','Volume'])
     frame.index = pd.to_datetime(frame.index).tz_localize(None).normalize()
     frame = frame[~frame.index.duplicated(keep='last')].sort_index()
     if len(frame)<45: raise ValueError('분석에 필요한 45거래일 미만')
