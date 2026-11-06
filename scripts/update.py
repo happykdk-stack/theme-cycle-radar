@@ -30,8 +30,8 @@ THEMES = [
 ]
 BENCHMARK = {'한국':'069500.KS','미국':'SPY'}
 
-def series_download(symbol):
-    frame = yf.download(symbol, period='18mo', interval='1d', auto_adjust=True,
+def series_download(symbol, period='18mo'):
+    frame = yf.download(symbol, period=period, interval='1d', auto_adjust=True,
                         progress=False, threads=False, timeout=20)
     if frame is None or frame.empty:
         raise ValueError('가격 데이터 없음')

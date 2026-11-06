@@ -58,3 +58,27 @@ test('missing securities ETF data stays gray rather than using theme signals',()
  assert.ok(nodes.get('securities-signal').text.includes('회색 · 데이터 부족'));
  assert.equal(nodes.get('securities-frames').children.length,3);
 });
+
+const historyFixture=(active=false)=>({window_start:'2024-08-29',asof:'2025-08-29',complete:true,latest_date:active?'2025-08-29':'2025-08-27',latest_run:{start_date:'2025-08-20',end_date:active?'2025-08-29':'2025-08-27',active},runs:[{start_date:'2025-08-20',end_date:active?'2025-08-29':'2025-08-27',active}]});
+test('green history shows latest date, full interval and active state for all filters',()=>{
+ for(const active of [true,false])for(const market of ['전체','한국','미국']){
+  const {nodes,run}=setup();const guide=fixture('한국',active?'green':'yellow');guide.etf_trend.green_history=historyFixture(active);
+  run('data='+JSON.stringify({securities_etf:guide,themes:[]})+';market='+JSON.stringify(market)+';render()');
+  const text=nodes.get('securities-green-history').text;
+  assert.ok(text.includes('가장 최근 모두 초록: '+(active?'2025-08-29':'2025-08-27')));
+  assert.ok(text.includes('해당 연속 구간: 2025-08-20 ~ '+(active?'2025-08-29':'2025-08-27')));
+  assert.ok(text.includes('현재 유지 여부: '+(active?'유지 중':'종료')));
+  assert.ok(text.includes('연속 구간 전체 (1개)'));
+ }
+});
+test('no green in a complete year is explicit, missing data never claims none',()=>{
+ for(const complete of [true,false]){
+  const {nodes,run}=setup();const guide=fixture('한국','yellow');guide.etf_trend.green_history={...historyFixture(),complete,latest_date:null,latest_run:null,runs:[]};
+  run('data='+JSON.stringify({securities_etf:guide,themes:[]})+';render()');
+  const text=nodes.get('securities-green-history').text;
+  assert.ok(text.includes(complete?'최근 1년간 없음':'데이터 부족 · 최근 1년간 없음 여부 확인 불가'));
+ }
+ const {nodes,run}=setup();run('data={themes:[]};render()');
+ assert.ok(nodes.get('securities-green-history').text.includes('데이터 부족'));
+ assert.ok(!nodes.get('securities-green-history').text.includes('최근 1년간 없음'));
+});

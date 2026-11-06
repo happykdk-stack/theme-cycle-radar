@@ -25,10 +25,39 @@ def combine(states):
 
 def empty_signal():
     return {"signal": "gray", "last_changed": None, "initial_since": None,
+            "green_history": None,
             "asof": None, "transitions": [], "green_performance": None, "green_since": None, "timeframes": {
                 key: {"state": "insufficient", "asof": None, "close": None,
                       "ma5": None, "previous_ma5": None}
                 for key in FREQUENCIES}}
+
+
+def green_history(signals):
+    """Calendar-year window, with runs contiguous in exchange sessions, not days.
+
+    Keep the true observed start of an overlapping run, even before the window.
+    Gray observations break runs and prevent an unqualified 'none' assertion.
+    """
+    asof = signals.index[-1]
+    start = asof - pd.DateOffset(years=1)
+    window = signals.loc[start:]
+    runs = []
+    first = None
+    for i, (day, color) in enumerate(signals.items()):
+        if color == "green" and first is None:
+            first = day
+        if first is not None and (color != "green" or i == len(signals) - 1):
+            last = day if color == "green" else signals.index[i - 1]
+            if last >= start:
+                runs.append({"start_date": first.date().isoformat(),
+                             "end_date": last.date().isoformat(),
+                             "active": bool(color == "green" and day == asof)})
+            first = None
+    latest = runs[-1] if runs else None
+    return {"window_start": start.date().isoformat(), "asof": asof.date().isoformat(),
+            "complete": bool(len(window) and signals.index[0] <= start and (window != "gray").all()),
+            "latest_date": latest["end_date"] if latest else None,
+            "latest_run": latest, "runs": runs}
 
 
 def traffic_light(frame, market, now=None):
@@ -64,34 +93,29 @@ def traffic_light(frame, market, now=None):
     aligned = close.reindex(sessions)
     # Missing recent sessions invalidate the live signal rather than silently
     # treating an older quote as the current week/month's latest price.
-    if aligned.reindex(completed[-5:]).isna().any():
-        return empty_signal()
+    recent_valid = aligned.reindex(completed).notna().rolling(5, min_periods=1).sum()
+    recent_valid = recent_valid == np.minimum(np.arange(len(completed)) + 1, 5)
     histories, snapshots = {}, {}
     for key, frequency in FREQUENCIES.items():
-        rows = []
-        for _, group in aligned.groupby(sessions.to_period(frequency)):
-            final = group.index[-1]
-            # For the current week/month use the most recent completed session,
-            # even before the calendar period ends. Historical periods retain
-            # their final scheduled close to avoid look-ahead bias.
-            available = group.index.intersection(completed)
-            if not len(available):
-                continue
-            is_current = final > completed[-1]
-            bar_day = available[-1] if is_current else final
-            if not is_current and close_times.loc[final] > now:
-                continue
-            full_period = group.index[0] >= close.index[0]
-            rows.append((bar_day, aligned.loc[bar_day] if full_period else np.nan))
-        bars = pd.Series(dict(rows), dtype=float).sort_index()
-        ma = bars.rolling(5, min_periods=5).mean()
-        previous = ma.shift(1)
+        periods = completed.to_period(frequency)
+        # Final closes are used ONLY through shifted prior-period aggregates.
+        # Every session supplies its own current partial month/week close, so
+        # later prices in that period cannot change an earlier day's signal.
+        groups = aligned.groupby(sessions.to_period(frequency))
+        finals = groups.agg(lambda group: group.iloc[-1])  # Never skip a missing final.
+        full = pd.Series([group.index[0] >= close.index[0] for _, group in groups], index=finals.index)
+        finals = finals.where(full)
+        bars = aligned.reindex(completed).where(full.reindex(periods).to_numpy())
+        prior_four = finals.shift(1).rolling(4, min_periods=4).sum()
+        prior_five = finals.shift(1).rolling(5, min_periods=5).mean()
+        ma = (bars + prior_four.reindex(periods).to_numpy()) / 5
+        previous = pd.Series(prior_five.reindex(periods).to_numpy(), index=completed)
         valid = bars.notna() & ma.notna() & previous.notna()
         states = pd.Series("insufficient", index=bars.index)
         states.loc[valid] = "mixed"
         states.loc[valid & (bars > ma) & (ma > previous)] = "up"
         states.loc[valid & (bars < ma) & (ma < previous)] = "down"
-        histories[key] = states.reindex(completed, method="ffill").fillna("insufficient")
+        histories[key] = states
         def number(series):
             return float(series.iloc[-1]) if len(series) and pd.notna(series.iloc[-1]) else None
         snapshots[key] = {"state": states.iloc[-1] if len(states) else "insufficient",
@@ -99,6 +123,7 @@ def traffic_light(frame, market, now=None):
                           "close": number(bars), "ma5": number(ma), "previous_ma5": number(previous)}
     signals = pd.Series([combine([histories[k].loc[day] for k in FREQUENCIES])
                          for day in completed], index=completed)
+    signals.loc[~recent_valid] = "gray"
     valid_signals = signals[signals != "gray"]
     initial = valid_signals.index[0] if len(valid_signals) else None
     # Initial availability is not presented as a historical signal change.
@@ -135,4 +160,5 @@ def traffic_light(frame, market, now=None):
             "asof": completed[-1].date().isoformat(),
             "initial_since": initial.date().isoformat() if initial is not None else None,
             "last_changed": transitions[-1]["date"] if transitions else None,
-            "transitions": transitions[-60:], "green_performance": green_performance, "green_since": green_since}
+            "transitions": transitions[-60:], "green_performance": green_performance, "green_since": green_since,
+            "green_history": green_history(signals)}

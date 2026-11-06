@@ -3,7 +3,7 @@
 .signal{display:inline-flex;align-items:center;gap:7px;white-space:nowrap;border-radius:999px;padding:5px 10px;background:#23354b}.signal::before{content:'';width:11px;height:11px;border-radius:50%;background:currentColor}.signal.green{color:#71e5af}.signal.red{color:#ff9c9c}.signal.yellow{color:#ffd38a}.signal.gray{color:#a5b1c2}.trend-details{margin-top:6px;line-height:1.6;font-size:11px;color:#9aadc8}.signal-summary{display:flex;gap:12px;flex-wrap:wrap;margin:14px 0}
 .securities{border:2px solid #466789;background:linear-gradient(120deg,#172d47,#14233a)}.securities h2{margin:0 0 8px}.securities-main{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}.securities-main .signal{font-size:clamp(20px,4vw,30px);font-weight:750;padding:12px 18px}.securities-main .signal::before{width:20px;height:20px}.securities-frames{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:16px}.securities-frame{background:#0c1c30;border-radius:10px;padding:12px;min-width:0}.securities-frame .signal{font-size:14px;padding:5px 7px}.securities-frame h3{margin:0 0 8px;font-size:15px}.securities-frame p{margin:7px 0 0;font-size:12px;color:#a6bbd5;overflow-wrap:anywhere}.securities-note{font-size:13px;color:#b9cde3;line-height:1.6;margin-bottom:0}@media(max-width:480px){body{padding:14px}.securities{padding:14px}.securities-frames{gap:6px}.securities-frame{padding:9px 7px}.securities-frame .signal{font-size:12px;gap:4px}}
 </style></head><body><main><header><div><h1>📡 한미 테마 사이클 레이더</h1><div class="muted small">Cycle Detector 4.2 · 조기 징후 · 확인 전환 · 자금 순환 레이더</div></div><button id="reload">↻ 최신 데이터 다시 읽기</button></header>
-<section class="panel securities" aria-labelledby="securities-heading"><div class="securities-main"><div><h2 id="securities-heading">증권 ETF 종합 신호등</h2><div class="muted small">KODEX 증권 · 102970 · 한국 증권업 ETF</div></div><div id="securities-signal" aria-live="polite"><span class="signal gray">회색 · 데이터 확인 중</span></div></div><div id="securities-frames" class="securities-frames"></div><p id="securities-dates" class="small muted">완성봉 데이터를 불러오는 중입니다…</p><p class="securities-note">초록: 월·주·일 모두 상승 · 노랑: 혼재·보합 · 빨강: 모두 하락 · 회색: 데이터 부족<br>완성봉 종가와 5기간 이동평균 방향을 기준으로 표시합니다. 증권업의 추세를 살펴보는 지표이며, 아래 개별 테마의 강도와 함께 판단할 수 있습니다.</p></section>
+<section class="panel securities" aria-labelledby="securities-heading"><div class="securities-main"><div><h2 id="securities-heading">증권 ETF 종합 신호등</h2><div class="muted small">KODEX 증권 · 102970 · 한국 증권업 ETF</div></div><div id="securities-signal" aria-live="polite"><span class="signal gray">회색 · 데이터 확인 중</span></div></div><div id="securities-frames" class="securities-frames"></div><p id="securities-dates" class="small muted">완성봉 데이터를 불러오는 중입니다…</p><div id="securities-green-history" class="small" aria-live="polite"></div><p class="securities-note">초록: 월·주·일 모두 상승 · 노랑: 혼재·보합 · 빨강: 모두 하락 · 회색: 데이터 부족<br>완료 거래일 종가와 5기간 이동평균 방향을 기준으로 표시합니다. 월·주봉은 각 거래일 당시 진행 중인 봉을 포함합니다. 증권업의 추세를 살펴보는 지표이며, 아래 개별 테마의 강도와 함께 판단할 수 있습니다.</p></section>
 <div class="panel notice" id="status" role="status">데이터를 불러오는 중입니다…</div>
 <section class="panel"><h2>새로운 사이클 조기 징후 TOP 3</h2><p class="muted small">당일 조기 징후를 우선 표시하고 확인된 상승 확산을 보조 후보로 표시합니다. 후보가 없으면 억지로 채우지 않습니다.</p><div id="top" class="stats"></div></section>
 <div class="controls"><button class="selected" data-market="전체">전체</button><button data-market="한국">🇰🇷 한국</button><button data-market="미국">🇺🇸 미국</button></div>
@@ -17,6 +17,19 @@ const signalLabels={green:'초록 · 3개 상승',yellow:'노랑 · 혼재·보�
 const stateColors={up:'green',down:'red',mixed:'yellow',insufficient:'gray'};
 const stateLabels={up:'상승',down:'하락',mixed:'혼재·보합',insufficient:'데이터 부족'};
 function signalBadge(color,label){const b=elem('span',label);b.className='signal '+color;return b}
+function renderGreenHistory(h){
+ const box=$('securities-green-history');box.replaceChildren(elem('h3','최근 1년 · 월·주·일 모두 초록'));
+ if(!h){box.append(elem('p','데이터 부족 · 최근 1년 이력 확인 불가'));return;}
+ box.append(elem('p','조회 범위: '+h.window_start+' ~ '+h.asof+' (완료 거래일 기준)'));
+ if(!h.latest_run){box.append(elem('p',h.complete?'최근 1년간 없음':'데이터 부족 · 최근 1년간 없음 여부 확인 불가'));return;}
+ const r=h.latest_run;
+ box.append(elem('p','가장 최근 모두 초록: '+h.latest_date),elem('p','해당 연속 구간: '+r.start_date+' ~ '+r.end_date+' · 현재 유지 여부: '+(r.active?'유지 중 (기준일까지)':'종료')));
+ if(!h.complete)box.append(elem('p','일부 기간 데이터 부족 · 확인 가능한 구간만 표시'));
+ const details=elem('details');details.append(elem('summary','최근 1년 연속 구간 전체 ('+h.runs.length+'개)'));
+ const list=elem('ul');for(const run of [...h.runs].reverse())list.append(elem('li',run.start_date+' ~ '+run.end_date+(run.active?' · 유지 중':' · 종료')));
+ details.append(list);box.append(details);
+ box.append(elem('p','휴장일은 구간을 끊지 않습니다. 시작일은 조회 범위 이전일 수 있으며, 유지 중인 구간의 종료일은 현재 기준일입니다.'));
+}
 function renderSecurities(){
  const t=data.securities_etf?.etf_trend||{},color=Object.hasOwn(signalLabels,t.signal)?t.signal:'gray';
  $('securities-signal').replaceChildren(signalBadge(color,signalLabels[color]));
@@ -28,6 +41,7 @@ function renderSecurities(){
   card.append(elem('h3',label),signalBadge(stateColors[state],stateLabels[state]),elem('p','기준 '+(f.asof||'—')),elem('p','종가 '+n(f.close)),elem('p','MA5 '+n(f.ma5)),elem('p','직전 MA5 '+n(f.previous_ma5)));
   $('securities-frames').append(card);
  }
+ renderGreenHistory(t.green_history);
  $('securities-dates').textContent=(t.green_performance?'녹색 전환 이후 '+(t.green_performance.return_pct>0?'+':'')+t.green_performance.return_pct.toFixed(2)+'% · 최고 '+t.green_performance.peak_return_pct.toFixed(2)+'% · '+t.green_performance.start_date+(t.green_performance.active?' (진행 중)':' (종료)')+' | ':'')+'최근 신호 변경일: '+(t.last_changed||(t.initial_since?'변경 없음 (최초 '+t.initial_since+')':'산출 전'))+' · 완성 일봉 기준일: '+(t.asof||'—');
 }
 function render(){if(!data)return;renderSecurities();const a=data.themes.filter(x=>market==='전체'||x.market===market).sort((x,y)=>(y.cycle_score??0)-(x.cycle_score??0));const picks=a.filter(x=>x.watch_active||['초기 유입','상승 확산'].includes(x.cycle_stage)).sort((x,y)=>(x.watch_active?0:1)-(y.watch_active?0:1)||(y.cycle_score??0)-(x.cycle_score??0)).slice(0,3);$('top').replaceChildren();if(!picks.length)$('top').append(elem('p','현재 확인된 초기 유입·상승 확산 후보 없음'));for(const x of picks){const p=elem('div');p.className='panel';p.append(elem('h2',x.market+' '+x.theme),elem('p',(x.watch_active?'조기 징후 (미확정)':x.cycle_stage)+' · '+x.cycle_score+'점'),elem('p','첫 징후: '+(x.watch_first_seen||'없음')+' · 전환 확인: '+(x.cycle_last_transition||'없음')),elem('p','전환 강도: '+(x.transition_strength??'—')+' · 조건 확인도: '+(x.confirmation_score??'—')+'/100'),elem('p',(x.watch_reasons||[]).join(' · ')));$('top').append(p)}

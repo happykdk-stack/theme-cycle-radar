@@ -107,7 +107,9 @@ def detect(df,bench):
 def build_v4(fetch=series_download, now=None):
     cache={}
     def cached(t):
-        if t not in cache:cache[t]=fetch(t)
+        if t not in cache:
+            # A full year of history needs six monthly bars of warm-up.
+            cache[t] = fetch(t, period='2y') if fetch is series_download and t == SECURITIES_ETF['ticker'] else fetch(t)
         return cache[t]
     result=build(cached)
     guide={**SECURITIES_ETF, "etf_trend":empty_signal()}
@@ -145,7 +147,7 @@ def build_v4(fetch=series_download, now=None):
         "실제 구성종목 동반 상승 및 기관·외국인 순매수는 미포함입니다.",
         "ETF 신호등은 거래소 최신 완료 거래일을 사용하며 진행 중인 월봉·주봉도 포함합니다. 상승=종가>MA5 및 MA5 상승, 하락=종가<MA5 및 MA5 하락, 그 외=혼재·보합입니다.",
         "종합 초록=월·주·일 모두 상승, 빨강=모두 하락, 노랑=혼재·보합, 회색=한 시간대라도 데이터 부족. MA5 방향 비교에는 최소 6개 기간의 관측값이 필요합니다.",
-        "최근 신호 변경일은 ETF 종합 색상이 바뀐 거래일입니다. 최초 산출은 변경으로 세지 않으며 공급자 과거 수정에 따라 달라질 수 있습니다."])
+        "최근 신호 변경일과 초록 구간은 각 과거 거래일 당시 진행 중인 월·주봉을 포함해 ETF 종합 색상을 재계산합니다. 최초 산출은 변경으로 세지 않으며 공급자 과거 수정에 따라 달라질 수 있습니다."])
     if result["errors"] and result["status"]=="ok":result["status"]="partial"
     return result
 

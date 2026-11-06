@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'scripts'))
-from traffic_lights import traffic_light, combine, exchange_schedule
+from traffic_lights import traffic_light, combine, exchange_schedule, green_history
 from update_v4 import build_v4, detect
 
 
@@ -121,7 +121,7 @@ class TrafficLightTests(unittest.TestCase):
         f.loc['2025-09-02':, 'Close'] = 100.
         r = traffic_light(f,'미국','2025-09-05T21:00Z')
         self.assertEqual(r['signal'], 'red')
-        self.assertEqual(r['last_changed'], '2025-09-05')
+        self.assertEqual(r['last_changed'], '2025-09-02')
         prior = traffic_light(f,'미국','2025-08-29T21:00Z')
         self.assertEqual(prior['signal'], 'green')
         self.assertIsNone(prior['last_changed'])

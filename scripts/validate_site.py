@@ -18,6 +18,22 @@ for theme in [*data['themes'], data['securities_etf']]:
         assert f['state'] in ('up', 'down', 'mixed', 'insufficient')
     if trend['last_changed']:
         assert trend['last_changed'] <= trend['asof']
+    history = trend['green_history']
+    if history is not None:
+        assert history['asof'] == trend['asof']
+        assert history['window_start'] <= history['asof']
+        assert isinstance(history['complete'], bool)
+        runs = history['runs']
+        assert history['latest_run'] == (runs[-1] if runs else None)
+        assert history['latest_date'] == (runs[-1]['end_date'] if runs else None)
+        for i, run in enumerate(runs):
+            assert run['start_date'] <= run['end_date'] <= history['asof']
+            assert run['end_date'] >= history['window_start']
+            assert isinstance(run['active'], bool)
+            assert run['active'] == (run['end_date'] == history['asof'] and trend['signal'] == 'green')
+            if i:
+                assert runs[i-1]['end_date'] < run['start_date']
+        assert bool(runs and runs[-1]['active']) == (trend['signal'] == 'green')
 assert not any(e['message'].startswith('ETF trend calculation:') for e in data['errors']), data['errors']
 (site / 'build.json').write_text(json.dumps({
     'commit': os.environ.get('BUILD_SHA', 'local'),
