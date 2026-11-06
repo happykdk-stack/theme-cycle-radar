@@ -108,8 +108,8 @@ def build_v4(fetch=series_download, now=None):
     cache={}
     def cached(t):
         if t not in cache:
-            # A full year of history needs six monthly bars of warm-up.
-            cache[t] = fetch(t, period='2y') if fetch is series_download and t == SECURITIES_ETF['ticker'] else fetch(t)
+            # Three years of history need six monthly bars of warm-up.
+            cache[t] = fetch(t, period='5y') if fetch is series_download and t == SECURITIES_ETF['ticker'] else fetch(t)
         return cache[t]
     result=build(cached)
     guide={**SECURITIES_ETF, "etf_trend":empty_signal()}

@@ -33,13 +33,13 @@ def empty_signal():
 
 
 def green_history(signals):
-    """Calendar-year window, with runs contiguous in exchange sessions, not days.
+    """Three-calendar-year window, with runs contiguous in exchange sessions, not days.
 
     Keep the true observed start of an overlapping run, even before the window.
     Gray observations break runs and prevent an unqualified 'none' assertion.
     """
     asof = signals.index[-1]
-    start = asof - pd.DateOffset(years=1)
+    start = asof - pd.DateOffset(years=3)
     window = signals.loc[start:]
     runs = []
     first = None

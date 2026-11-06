@@ -18,14 +18,14 @@ const stateColors={up:'green',down:'red',mixed:'yellow',insufficient:'gray'};
 const stateLabels={up:'상승',down:'하락',mixed:'혼재·보합',insufficient:'데이터 부족'};
 function signalBadge(color,label){const b=elem('span',label);b.className='signal '+color;return b}
 function renderGreenHistory(h){
- const box=$('securities-green-history');box.replaceChildren(elem('h3','최근 1년 · 월·주·일 모두 초록'));
- if(!h){box.append(elem('p','데이터 부족 · 최근 1년 이력 확인 불가'));return;}
+ const box=$('securities-green-history');box.replaceChildren(elem('h3','최근 3년 · 월·주·일 모두 초록'));
+ if(!h){box.append(elem('p','데이터 부족 · 최근 3년 이력 확인 불가'));return;}
  box.append(elem('p','조회 범위: '+h.window_start+' ~ '+h.asof+' (완료 거래일 기준)'));
- if(!h.latest_run){box.append(elem('p',h.complete?'최근 1년간 없음':'데이터 부족 · 최근 1년간 없음 여부 확인 불가'));return;}
+ if(!h.latest_run){box.append(elem('p',h.complete?'최근 3년간 없음':'데이터 부족 · 최근 3년간 없음 여부 확인 불가'));return;}
  const r=h.latest_run;
  box.append(elem('p','가장 최근 모두 초록: '+h.latest_date),elem('p','해당 연속 구간: '+r.start_date+' ~ '+r.end_date+' · 현재 유지 여부: '+(r.active?'유지 중 (기준일까지)':'종료')));
  if(!h.complete)box.append(elem('p','일부 기간 데이터 부족 · 확인 가능한 구간만 표시'));
- const details=elem('details');details.append(elem('summary','최근 1년 연속 구간 전체 ('+h.runs.length+'개)'));
+ const details=elem('details');details.append(elem('summary','최근 3년 연속 구간 전체 ('+h.runs.length+'개)'));
  const list=elem('ul');for(const run of [...h.runs].reverse())list.append(elem('li',run.start_date+' ~ '+run.end_date+(run.active?' · 유지 중':' · 종료')));
  details.append(list);box.append(details);
  box.append(elem('p','휴장일은 구간을 끊지 않습니다. 시작일은 조회 범위 이전일 수 있으며, 유지 중인 구간의 종료일은 현재 기준일입니다.'));

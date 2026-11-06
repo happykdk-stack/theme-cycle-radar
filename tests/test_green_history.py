@@ -13,7 +13,7 @@ from update_v4 import build_v4
 
 class GreenHistoryTests(unittest.TestCase):
     def frame(self):
-        dates = pd.DatetimeIndex(exchange_schedule('한국', '2023-08-01', '2025-08-29').index).tz_localize(None)
+        dates = pd.DatetimeIndex(exchange_schedule('한국', '2021-08-01', '2025-08-29').index).tz_localize(None)
         values = 300 + np.arange(len(dates)) * .1 + 20 * np.sin(np.arange(len(dates)) / 12)
         return pd.DataFrame({'Close': values, 'Open': values, 'Volume': 1000.}, index=dates)
 
@@ -49,11 +49,11 @@ class GreenHistoryTests(unittest.TestCase):
             self.assertEqual(prefix, traffic_light(changed, '한국', date + 'T06:30Z'))
 
     def test_runs_weekend_single_day_and_year_boundary(self):
-        dates = pd.to_datetime(['2024-02-28', '2024-02-29', '2024-03-01',
+        dates = pd.to_datetime(['2022-02-28', '2022-03-01', '2022-03-02',
                                 '2025-02-21', '2025-02-24', '2025-02-25', '2025-02-28'])
         s = pd.Series(['green', 'green', 'yellow', 'green', 'green', 'red', 'green'], index=dates)
         h = green_history(s)
-        self.assertEqual(h['window_start'], '2024-02-28')
+        self.assertEqual(h['window_start'], '2022-02-28')
         self.assertEqual(h['runs'][1], {'start_date': '2025-02-21', 'end_date': '2025-02-24', 'active': False})
         self.assertEqual(h['latest_run'], {'start_date': '2025-02-28', 'end_date': '2025-02-28', 'active': True})
         self.assertEqual(h['latest_date'], '2025-02-28')
@@ -62,7 +62,7 @@ class GreenHistoryTests(unittest.TestCase):
         self.assertFalse(green_history(s)['latest_run']['active'])
 
     def test_none_outside_window_and_incomplete_are_distinct(self):
-        dates = pd.date_range('2023-01-01', '2025-08-29', freq='B')
+        dates = pd.date_range('2021-01-01', '2025-08-29', freq='B')
         s = pd.Series('yellow', index=dates)
         s.iloc[0] = 'green'
         h = green_history(s)
@@ -75,7 +75,7 @@ class GreenHistoryTests(unittest.TestCase):
         self.assertFalse(green_history(s.tail(20))['complete'])
 
     def test_overlapping_run_keeps_start_before_window(self):
-        dates = pd.date_range('2023-01-01', '2025-08-29', freq='B')
+        dates = pd.date_range('2021-01-01', '2025-08-29', freq='B')
         s = pd.Series('green', index=dates)
         h = green_history(s)
         self.assertLess(h['latest_run']['start_date'], h['window_start'])
@@ -90,11 +90,11 @@ class GreenHistoryTests(unittest.TestCase):
         self.assertFalse(r['green_history']['latest_run']['active'])
         self.assertFalse(r['green_history']['complete'])
 
-    def test_live_download_uses_two_years_only_for_securities(self):
+    def test_live_download_uses_five_years_only_for_securities(self):
         f = self.frame()
         with patch('update_v4.series_download', return_value=f) as fetch:
             build_v4(fetch=fetch, now='2025-08-29T06:30Z')
         calls = [call for call in fetch.call_args_list if call.args == ('102970.KS',)]
         self.assertEqual(len(calls), 1)
-        self.assertEqual(calls[0].kwargs, {'period': '2y'})
+        self.assertEqual(calls[0].kwargs, {'period': '5y'})
         self.assertTrue(all(not call.kwargs for call in fetch.call_args_list if call.args != ('102970.KS',)))
