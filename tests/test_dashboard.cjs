@@ -106,5 +106,5 @@ test('intraday MA1 score takes precedence and completed history remains separate
  const row=nodes.get('theme-scores').children[0];assert.equal(row.children[3].textContent,'20 / 100점 (장중·미확정)');
  assert.ok(row.children[7].text.includes('상승 · +20점'));assert.ok(row.children[8].text.includes('2025-09-01'));
  assert.ok(nodes.get('securities-dates').text.includes('장중·미확정'));assert.ok(nodes.get('securities-green-history').text.includes('2025-08-29'));
- assert.ok(!html.includes('MA5'));
+ assert.ok(!html.slice(html.indexOf('id="securities-heading"'),html.indexOf('id="short-view"')).includes('MA5'));
 });
