@@ -17,6 +17,21 @@ class HeikinAshiTests(unittest.TestCase):
         self.assertAlmostEqual(result["Open"].iloc[1], 11.5)
         self.assertAlmostEqual(result["Close"].iloc[1], 13.5)
 
+    def test_actual_change_is_independent_of_ha_direction(self):
+        from traffic_lights import exchange_schedule
+        sessions = pd.DatetimeIndex(exchange_schedule("미국", "2025-01-01", "2025-08-29").index).tz_localize(None)
+        prices = np.linspace(100., 180., len(sessions))
+        frame = pd.DataFrame({"Open": prices - 1, "High": prices + 2,
+                              "Low": prices - 2, "Close": prices, "Volume": 1000.}, index=sessions)
+        frame.loc["2025-08-29", "Open"] = 190.
+        frame.loc["2025-08-29", "High"] = 191.
+        result = ha_traffic_light(frame, "미국", "2025-08-29T21:00Z")
+        month = result["timeframes"]["monthly"]
+        self.assertIn("actual_change_pct", month)
+        self.assertAlmostEqual(month["actual_change_pct"], round((month["actual_close"] / month["actual_open"] - 1) * 100, 2))
+        self.assertIn("ha_open", month)
+        self.assertIn("ha_close", month)
+
     def test_future_prices_do_not_change_past_signal(self):
         from traffic_lights import exchange_schedule
         sessions = pd.DatetimeIndex(exchange_schedule("미국", "2025-01-01", "2025-08-29").index).tz_localize(None)

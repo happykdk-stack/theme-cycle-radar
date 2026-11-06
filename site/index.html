@@ -43,7 +43,7 @@ function renderSecurities(){
  for(const [key,label] of [['monthly','월봉'],['weekly','주봉'],['daily','일봉']]){
   const f=t.timeframes?.[key]||{},state=Object.hasOwn(stateLabels,f.state)?f.state:'insufficient';
   const card=elem('div');card.className='securities-frame';
-  card.append(elem('h3',label),signalBadge(stateColors[state],stateLabels[state]),elem('p','기준 '+(f.asof||'—')),elem('p','실제 종가 '+n(f.close)),elem('p','HA 종가 '+n(f.ha_close)));
+  card.append(elem('h3',label),signalBadge(stateColors[state],stateLabels[state]),elem('p','기준 '+(f.asof||'—')),elem('p','실제 시가 '+n(f.actual_open)+' · 종가 '+n(f.actual_close)),elem('p','실제 등락률 '+(f.actual_change_pct==null?'N/A':(f.actual_change_pct>0?'+':'')+f.actual_change_pct.toFixed(2)+'%')),elem('p','HA 시가 '+n(f.ha_open)+' · 종가 '+n(f.ha_close)));
   $('securities-frames').append(card);
  }
  renderGreenHistory(base.green_history);
@@ -60,7 +60,7 @@ function renderThemeScores(themes){
   if(score(x)>=0){
    const proof=elem('details');proof.append(elem('summary','판정 근거'));
    const n=v=>v==null?'—':Number(v).toLocaleString('ko-KR',{maximumFractionDigits:2});
-   for(const [key,label] of [['monthly','월봉'],['weekly','주봉'],['daily','일봉']]){const f=t.timeframes?.[key]||{};proof.append(elem('p',label+' · 기준 '+(f.asof||'—')+' · 현재가(MA1) '+n(f.ma1??f.close)+' · 직전 기간 종가 '+n(f.previous_ma1)));}
+   for(const [key,label] of [['monthly','월봉'],['weekly','주봉'],['daily','일봉']]){const f=t.timeframes?.[key]||{};proof.append(elem('p',label+' · 기준 '+(f.asof||'—')+' · 실제 시가 '+n(f.actual_open)+' / 종가 '+n(f.actual_close)+' / 등락률 '+(f.actual_change_pct==null?'N/A':f.actual_change_pct+'%')+' · HA 시가 '+n(f.ha_open)+' / 종가 '+n(f.ha_close)));}
    scoreCell.append(proof);
   }
   tr.append(scoreCell);

@@ -44,7 +44,7 @@ test('securities ETF is first panel and remains visible for every market filter'
  assert.ok(nodes.get('securities-signal').text.includes('초록 · 3개 상승'));
  assert.equal(nodes.get('securities-frames').children.length,3);
  assert.ok(nodes.get('securities-dates').text.includes('2025-08-28'));
- assert.ok(nodes.get('securities-frames').text.includes('HA 종가 —'));
+ assert.ok(nodes.get('securities-frames').text.includes('HA 시가'));
 });
 test('missing securities ETF data stays gray rather than using theme signals',()=>{
  const {nodes,run}=setup();run('data={themes:[]};render()');

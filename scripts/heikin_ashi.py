@@ -88,8 +88,14 @@ def ha_traffic_light(frame, market, now=None, include_intraday=False):
             history[day] = (state, ho, hc)
         histories[key] = pd.Series({day: val[0] for day, val in history.items()})
         state, ho, hc = history[completed[-1]]
+        actual = _aggregate(period_rows)
+        actual_open = actual["Open"] if actual is not None else None
+        actual_close = actual["Close"] if actual is not None else None
+        actual_change = round((actual_close / actual_open - 1) * 100, 2) if actual_open and actual_close else None
         snapshots[key] = {"state": state, "asof": completed[-1].date().isoformat(),
                           "ha_open": ho, "ha_close": hc,
+                          "actual_open": actual_open, "actual_close": actual_close,
+                          "actual_change_pct": actual_change,
                           "close": float(aligned.loc[completed[-1], "Close"]) if pd.notna(aligned.loc[completed[-1], "Close"]) else None,
                           "provisional": key != "daily" and completed[-1].to_period(frequency) == local_today.to_period(frequency)}
     signals = pd.Series([combine([histories[k].loc[day] for k in FREQUENCIES]) for day in completed], index=completed)
