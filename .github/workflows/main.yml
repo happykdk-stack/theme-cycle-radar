@@ -52,6 +52,9 @@ jobs:
       - name: Update market data
         run: python scripts/update_v4.py
 
+      - name: Update short-term crash rebound scan
+        run: python scripts/short_term.py
+
       - name: Validate ETF signal data and stamp deployment
         env:
           BUILD_SHA: ${{ github.sha }}
