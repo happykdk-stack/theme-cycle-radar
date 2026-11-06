@@ -174,7 +174,7 @@ class TrafficLightTests(unittest.TestCase):
         self.assertEqual(r['status'], 'partial')
 
     def test_calendar_failure_is_reported(self):
-        with patch('traffic_lights.exchange_schedule', side_effect=RuntimeError('calendar unavailable')):
+        with patch('heikin_ashi.exchange_schedule', side_effect=RuntimeError('calendar unavailable')):
             r = build_v4(lambda ticker:self.frame(), now='2025-08-29T21:00Z')
         self.assertTrue(all(t['etf_trend']['signal']=='gray' for t in r['themes']))
         self.assertTrue(any('calendar unavailable' in e['message'] for e in r['errors']))
