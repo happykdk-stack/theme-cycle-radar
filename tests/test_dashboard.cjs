@@ -28,20 +28,13 @@ const fixture=(market,signal)=>({market,theme:'테스트',ticker:market==='한�
  etf_trend:{signal,bullish_score:50,last_changed:'2025-08-28',asof:'2025-08-29',timeframes:{
  monthly:{state:'up',asof:'2025-07-31',close:120,ma5:110,previous_ma5:108},
  weekly:{state:'down',asof:'2025-08-22'},daily:{state:'mixed',asof:'2025-08-29'}}}});
-test('theme table displays active expansion date and return with sign',()=>{
- const {nodes,run}=setup();const x=fixture('한국','green');x.cycle_stage='상승 확산';x.strength_since='2025-08-20';x.strength_return_pct=4.25;
- run('data='+JSON.stringify({themes:[x]})+';render()');
- const row=nodes.get('themes').children[0];assert.equal(row.children[3].text,'2025-08-20');assert.equal(row.children[4].text,'+4.25%');assert.equal(row.children[4].className,'ok');
- assert.equal(row.children[6].text,'70');assert.equal(row.children[7].text,'60');
- assert.ok(!html.includes('id="etf-signals"'));
-});
-test('strength below 60 hides date and return',()=>{
- const {nodes,run}=setup();const x=fixture('미국','red');x.cycle_score=55;run('data='+JSON.stringify({themes:[x]})+';render()');
- const row=nodes.get('themes').children[0];assert.equal(row.children[3].text,'없음');assert.equal(row.children[4].text,'N/A');
-});
-test('market filter preserves theme table',()=>{
- const {nodes,run}=setup();run('data='+JSON.stringify({themes:[fixture('한국','green'),fixture('미국','red')]})+';market="한국";render()');
- assert.equal(nodes.get('themes').children.length,1);assert.ok(nodes.get('themes').text.includes('KR'));assert.ok(!nodes.get('themes').text.includes('US'));
+test('cycle sections are removed and aggregate traffic light is the first column',()=>{
+ const {nodes,run}=setup();run('data='+JSON.stringify({themes:[fixture('한국','yellow')]})+';render()');
+ assert.ok(!html.includes('id="themes"'));assert.ok(!html.includes('id="history"'));assert.ok(!html.includes('<h2>테마별 사이클'));assert.ok(!html.includes('<h2>사이클 전환'));assert.ok(!html.includes('Cycle Detector'));
+ assert.ok(html.includes('<tr><th>종합 신호등</th><th>시장</th><th>테마 ETF</th>'));
+ assert.ok(nodes.get('theme-scores').children[0].children[0].text.includes('노랑'));
+ assert.ok(nodes.get('theme-scores').children[0].children[3].text.includes('판정 근거'));
+ assert.ok(nodes.get('theme-scores').children[0].children[3].text.includes('종가 120'));
 });
 test('securities ETF is first panel and remains visible for every market filter',()=>{
  const {nodes,run}=setup();
@@ -89,9 +82,9 @@ test('weighted theme scores sort descending, show contributions and honor market
  high.etf_trend.timeframes.weekly.state='up';high.etf_trend.timeframes.daily.state='up';
  run('data='+JSON.stringify({themes:[low,high]})+';render()');
  const rows=nodes.get('theme-scores').children;
- assert.ok(rows[0].text.includes('US'));assert.equal(rows[0].children[2].text,'100 / 100점');
- assert.ok(rows[0].children[3].text.includes('+50점'));assert.ok(rows[0].children[4].text.includes('+30점'));assert.ok(rows[0].children[5].text.includes('+20점'));
- assert.equal(rows[1].children[2].text,'50 / 100점');assert.ok(rows[1].children[4].text.includes('+0점'));
+ assert.ok(rows[0].text.includes('US'));assert.equal(rows[0].children[3].textContent,'100 / 100점');
+ assert.ok(rows[0].children[4].text.includes('+50점'));assert.ok(rows[0].children[5].text.includes('+30점'));assert.ok(rows[0].children[6].text.includes('+20점'));
+ assert.equal(rows[1].children[3].textContent,'50 / 100점');assert.ok(rows[1].children[5].text.includes('+0점'));
  run('market="한국";render()');assert.equal(nodes.get('theme-scores').children.length,1);assert.ok(nodes.get('theme-scores').text.includes('KR'));
 });
 test('zero is a real score and unavailable scores are not zero',()=>{
@@ -100,7 +93,7 @@ test('zero is a real score and unavailable scores are not zero',()=>{
  for(const f of Object.values(zero.etf_trend.timeframes))f.state='down';
  run('data='+JSON.stringify({themes:[missing,zero]})+';render()');
  const rows=nodes.get('theme-scores').children;
- assert.equal(rows[0].children[2].text,'0 / 100점');assert.equal(rows[1].children[2].text,'데이터 부족');
+ assert.equal(rows[0].children[3].textContent,'0 / 100점');assert.equal(rows[1].children[3].text,'데이터 부족');
  assert.ok(!rows[1].text.includes('+50점'));
  assert.ok(!html.includes('새로운 사이클'));assert.ok(!html.includes('조기 징후'));assert.ok(!html.includes('watch_active'));assert.ok(!html.includes('id="top"'));
  assert.ok(html.includes('실제 상승 확률(%)은 아닙니다'));
