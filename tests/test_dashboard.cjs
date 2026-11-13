@@ -21,6 +21,7 @@ function setup(){
  const context=vm.createContext({document,console,Date,setInterval:(callback,ms)=>timers.push({callback,ms})});
  // Drive rendering directly with deterministic fixture data, without network.
  vm.runInContext(html.match(/<script>([\s\S]*?)<\/script>/)[1].replace(/load\(\);(?:loadPER\(\);)?\s*$/,''),context);
+ vm.runInContext('loadPER=()=>{}',context);
  return {nodes,timers,document,run:s=>vm.runInContext(s,context)};
 }
 const fixture=(market,signal)=>({market,theme:'테스트',ticker:market==='한국'?'KR':'US',

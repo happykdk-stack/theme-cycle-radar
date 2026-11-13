@@ -1,5 +1,6 @@
 """Optional ETF valuation observations. Never infer historical P/E from ETF price."""
 import json
+import csv
 import math
 from datetime import datetime, timezone
 from pathlib import Path
@@ -11,6 +12,7 @@ OUT=ROOT/"site"/"per_history.json"
 PREVIOUS_URL="https://happykdk-stack.github.io/theme-cycle-radar/per_history.json"
 FUTURES={"261220.KS","USO"}
 MAX_POINTS=370
+KRX_CSV=ROOT/"data"/"krx_index_per.csv"
 INDICES=[
  ("한국","코스피","^KS11"),("한국","코스닥","^KQ11"),("한국","코스피200","^KS200"),
  ("미국","S&P 500","^GSPC"),("미국","나스닥 종합","^IXIC"),
@@ -104,6 +106,35 @@ def parse_multpl(html):
         if value is not None:found[date]={"date":date,"pe":value}
     return sorted(found.values(),key=lambda x:x["date"])
 
+def krx_csv_pe(path=KRX_CSV):
+    """Read licensed KRX index P/E observations; no network scraping or fabricated values.
+
+    Explicit schema: date YYYY-MM-DD, ticker (^KS11/^KQ11/^KS200), pe, source.
+    The source column must identify the supplied licensed KRX dataset.
+    """
+    result={}
+    if not path.exists():return result
+    with path.open("r",encoding="utf-8-sig",newline="") as handle:
+        reader=csv.DictReader(handle)
+        if not {"date","ticker","pe","source"}.issubset(reader.fieldnames or []):
+            raise ValueError("KRX CSV requires date,ticker,pe,source")
+        for row in reader:
+            date=row["date"].strip()
+            try:_dt.strptime(date,"%Y-%m-%d")
+            except ValueError:raise ValueError("Invalid KRX PER date: "+date)
+            ticker=row["ticker"].strip()
+            if ticker not in {"^KS11","^KQ11","^KS200"}:continue
+            source=row["source"].strip()
+            if not source or "KRX" not in source.upper():raise ValueError("KRX provenance required")
+            value=valid_pe(row["pe"])
+            if value is None:continue
+            entry=result.setdefault(ticker,{"history":[],"source":source,"frequency":"as supplied"})
+            entry["history"].append({"date":date,"pe":value})
+    for ticker,item in result.items():
+        dedup={x["date"]:x for x in item["history"]}
+        item["history"]=sorted(dedup.values(),key=lambda x:x["date"])
+    return result
+
 def historical_index_pe():
     result={}
     errors={}
@@ -148,6 +179,10 @@ def build(fetch=fetch_pe,prior=None,asof=None,fetch_prices=series_download,fetch
                       "history":history,"error":err,"price_context":context,
                       "source":"Yahoo Finance ETF quote trailingPE (provider methodology unverified)"}
     index_pe,pe_errors=fetch_index_pe()
+    try:
+        index_pe.update(krx_csv_pe())
+    except Exception as exc:
+        pe_errors["KRX_CSV"]=str(exc)[:160]
     indices={}
     for market,name,ticker in INDICES:
         ctx=price_context(ticker,fetch_prices)
@@ -161,9 +196,9 @@ def build(fetch=fetch_pe,prior=None,asof=None,fetch_prices=series_download,fetch
                          "price_context":ctx,"pe_error":pe_errors.get(ticker),
                          "source":historical.get("source","No verified historical index P/E feed connected"),
                          "pe_frequency":historical.get("frequency")}
-    return {"version":"1.2","generated_at_utc":datetime.now(timezone.utc).isoformat(timespec="seconds"),
+    return {"version":"1.3","generated_at_utc":datetime.now(timezone.utc).isoformat(timespec="seconds"),
             "history_source_error":history_error,"index_pe_errors":pe_errors,"etfs":etfs,"indices":indices,
-            "note":"ETF PER observations start at collection. Index prices are genuine index levels. S&P 500 monthly historical trailing P/E is loaded from Multpl when available. Estimates are excluded. Other index P/E remains N/A. Rebound events are retrospective, not predictions."}
+            "note":"ETF PER observations start at collection. Index prices are genuine index levels. S&P 500 monthly historical trailing P/E is loaded from Multpl when available. Estimates are excluded. KRX index P/E is loaded only from a provenance-labelled authorized CSV when supplied. Other index P/E remains N/A. Rebound events are retrospective, not predictions."}
 
 if __name__=="__main__":
     data=build()
