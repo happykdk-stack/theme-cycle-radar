@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 from update import OUT, BENCHMARK, THEMES, series_download, build
 from traffic_lights import traffic_light, empty_signal
-from heikin_ashi import ha_traffic_light
+from heikin_ashi import ha_traffic_light, empty_ha_signal
 
 SECURITIES_ETF = {"market":"한국", "ticker":"102970.KS", "fund":"KODEX 증권"}
 
@@ -101,7 +101,7 @@ def build_v4(fetch=series_download, now=None):
             cache[t] = fetch(t, period='5y') if fetch is series_download and t == SECURITIES_ETF['ticker'] else fetch(t)
         return cache[t]
     result=build(cached)
-    guide={**SECURITIES_ETF, "etf_trend":empty_signal()}
+    guide={**SECURITIES_ETF, "etf_trend":empty_ha_signal()}
     try:guide_frame=cached(guide["ticker"])
     except Exception as exc:
         result["errors"].append({"ticker":guide["ticker"],"message":"Securities ETF: "+str(exc)[:160]})
@@ -116,7 +116,7 @@ def build_v4(fetch=series_download, now=None):
         if ticker not in present:
             result["themes"].append({"market":market,"theme":theme,"ticker":ticker,"fund":fund,"asof":None})
     for t in result["themes"]:
-        t["etf_trend"]=empty_signal()
+        t["etf_trend"]=empty_ha_signal()
         try:frame=cached(t["ticker"])
         except Exception as exc:
             result["errors"].append({"ticker":t["ticker"],"message":"ETF trend: "+str(exc)[:160]})
@@ -134,8 +134,8 @@ def build_v4(fetch=series_download, now=None):
     result["limitations"].extend(["신호등 상승 점수는 월봉 상승 50점 + 주봉 상승 30점 + 일봉 상승 20점이며, 혼재·보합과 하락은 0점입니다. 데이터 부족 시 미산출하며 실제 상승 확률이 아닙니다.","사이클 단계는 ETF 가격·거래량 대용지표 기반 추정이며 기관 자금 흐름이 아닙니다.",
         "단계 전환은 연속 2거래일 확인 후 기록됩니다. 점수는 예측 확률이 아닙니다.",
         "실제 구성종목 동반 상승 및 기관·외국인 순매수는 미포함입니다.",
-        "ETF 신호등은 MA1 가격 방향을 사용합니다. 장중 시세가 있으면 미확정 점수로 별도 표시하며, 과거 이력은 완료 거래일만 사용합니다. 상승=현재 MA1(가격)>직전 기간 종가, 하락=현재 MA1(가격)<직전 기간 종가, 그 외=혼재·보합입니다.",
-        "종합 초록=월·주·일 모두 상승, 빨강=모두 하락, 노랑=혼재·보합, 회색=한 시간대라도 데이터 부족. MA1 방향은 해당 기간 가격과 직전 기간 종가를 비교합니다. 같으면 보합입니다.",
+        "ETF 신호등은 월·주·일 OHLC를 하이킨 아시로 변환합니다. HA 종가>HA 시가면 상승, 낮으면 하락, 같으면 보합입니다. 실제 시가 대비 등락률은 별도로 표시하며 HA 방향과 다를 수 있습니다.",
+        "종합 초록=월·주·일 모두 상승, 빨강=모두 하락, 노랑=혼재·보합, 회색=한 시간대라도 데이터 부족. 완료 거래일까지 계산하며 진행 중인 월·주봉은 미확정입니다. 장중 일봉 HA 신호는 제공하지 않습니다.",
         "최근 신호 변경일과 초록 구간은 각 과거 거래일 당시 진행 중인 월·주봉을 포함해 ETF 종합 색상을 재계산합니다. 최초 산출은 변경으로 세지 않으며 공급자 과거 수정에 따라 달라질 수 있습니다."])
     if result["errors"] and result["status"]=="ok":result["status"]="partial"
     return result

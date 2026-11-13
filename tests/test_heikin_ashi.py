@@ -46,5 +46,30 @@ class HeikinAshiTests(unittest.TestCase):
         self.assertEqual(earlier["timeframes"], after["timeframes"])
         self.assertEqual(earlier["method"], "Heikin-Ashi")
 
+    def test_lit_style_negative_real_month_can_have_positive_ha(self):
+        from traffic_lights import exchange_schedule
+        sessions = pd.DatetimeIndex(exchange_schedule('미국', '2025-01-01', '2025-08-29').index).tz_localize(None)
+        prices = np.linspace(100., 180., len(sessions))
+        frame = pd.DataFrame({'Open':prices, 'High':prices+2, 'Low':prices-2, 'Close':prices}, index=sessions)
+        frame.loc['2025-08-01':, ['Open','High','Low','Close']] = [190.,191.,184.,185.]
+        result = ha_traffic_light(frame, '미국', '2025-08-29T21:00Z')
+        monthly = result['timeframes']['monthly']
+        raw = frame.groupby(frame.index.to_period('M')).agg({'Open':'first','High':'max','Low':'min','Close':'last'})
+        oracle = ha_candles(raw).iloc[-1]
+        self.assertAlmostEqual(monthly['ha_open'], oracle['Open'])
+        self.assertAlmostEqual(monthly['ha_close'], oracle['Close'])
+        self.assertLess(monthly['actual_change_pct'], 0)
+        self.assertEqual(monthly['state'], 'up')
+
+    def test_empty_and_stale_signals_keep_ha_method(self):
+        self.assertEqual(ha_traffic_light(pd.DataFrame(), '미국')['method'], 'Heikin-Ashi')
+        from traffic_lights import exchange_schedule
+        sessions = pd.DatetimeIndex(exchange_schedule('미국', '2025-01-01', '2025-08-28').index).tz_localize(None)
+        frame = pd.DataFrame({'Close':np.arange(len(sessions))+100.}, index=sessions)
+        result = ha_traffic_light(frame, '미국', '2025-08-29T21:00Z')
+        self.assertEqual(result['signal'], 'gray')
+        self.assertIsNone(result['bullish_score'])
+        self.assertTrue(all(f['state']=='insufficient' for f in result['timeframes'].values()))
+
 if __name__ == "__main__":
     unittest.main()

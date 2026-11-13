@@ -17,24 +17,37 @@ function setup(){
  const document={createElement:t=>new Element(t),getElementById:id=>{
   if(!nodes.has(id))nodes.set(id,new Element('div'));return nodes.get(id);
  },querySelectorAll:()=>[]};
- const context=vm.createContext({document,console,Date});
+ const timers=[];
+ const context=vm.createContext({document,console,Date,setInterval:(callback,ms)=>timers.push({callback,ms})});
  // Drive rendering directly with deterministic fixture data, without network.
  vm.runInContext(html.match(/<script>([\s\S]*?)<\/script>/)[1].replace(/load\(\);\s*$/,''),context);
- return {nodes,run:s=>vm.runInContext(s,context)};
+ return {nodes,timers,document,run:s=>vm.runInContext(s,context)};
 }
 const fixture=(market,signal)=>({market,theme:'테스트',ticker:market==='한국'?'KR':'US',
  cycle_score:70,transition_strength:60,confirmation_score:75,score_change_5d:5,
  cycle_stage:'관찰',asof:'2025-08-29',cycle_metrics:{rs_20d_pct:2,volume_ratio:1.1},
  etf_trend:{signal,bullish_score:50,advanced_bullish_score:50,last_changed:'2025-08-28',asof:'2025-08-29',timeframes:{
- monthly:{state:'up',asof:'2025-07-31',close:120,ma1:120,previous_ma1:108},
+ monthly:{state:'up',asof:'2025-07-31',close:120,actual_open:108,actual_close:120,actual_change_pct:11.11,ha_open:110,ha_close:118},
  weekly:{state:'down',asof:'2025-08-22'},daily:{state:'mixed',asof:'2025-08-29'}}}});
+
+test('visible dashboard reloads published data every ten minutes',()=>{
+ const {nodes,timers,document,run}=setup();
+ assert.equal(timers.length,1);assert.equal(timers[0].ms,600000);
+ run('let reloads=0,shortReloads=0;load=()=>reloads++;loadShort=()=>shortReloads++');
+ document.getElementById('short-view').hidden=true;timers[0].callback();
+ assert.equal(run('reloads'),1);assert.equal(run('shortReloads'),0);
+ nodes.get('short-view').hidden=false;timers[0].callback();
+ assert.equal(run('reloads'),2);assert.equal(run('shortReloads'),1);
+ document.hidden=true;timers[0].callback();assert.equal(run('reloads'),2);
+});
 test('cycle sections are removed and aggregate traffic light is the first column',()=>{
  const {nodes,run}=setup();run('data='+JSON.stringify({themes:[fixture('한국','yellow')]})+';render()');
  assert.ok(!html.includes('id="themes"'));assert.ok(!html.includes('id="history"'));assert.ok(!html.includes('<h2>테마별 사이클'));assert.ok(!html.includes('<h2>사이클 전환'));assert.ok(!html.includes('Cycle Detector'));
  assert.ok(html.includes('<tr><th>종합 신호등</th><th>시장</th><th>테마 ETF</th>'));
  assert.ok(nodes.get('theme-scores').children[0].children[0].text.includes('노랑'));
  assert.ok(nodes.get('theme-scores').children[0].children[3].text.includes('판정 근거'));
- assert.ok(nodes.get('theme-scores').children[0].children[3].text.includes('실제 종가 120'));
+ assert.ok(nodes.get('theme-scores').children[0].children[3].text.includes('실제 시가 108 / 종가 120 / 등락률 11.11%'));
+ assert.ok(nodes.get('theme-scores').children[0].children[3].text.includes('HA 시가 110 / 종가 118'));
 });
 test('securities ETF is first panel and remains visible for every market filter',()=>{
  const {nodes,run}=setup();

@@ -54,8 +54,9 @@ class MA1IntradayTests(unittest.TestCase):
     def test_missing_previous_session_is_unavailable_and_equal_price_is_flat(self):
         f = self.frame().drop(pd.Timestamp('2025-08-26'))
         r = traffic_light(f, '한국', '2025-08-27T01:00Z', include_intraday=True)
-        self.assertIsNone(r['intraday']['bullish_score'])
-        self.assertEqual(r['intraday']['signal'], 'gray')
+        self.assertIsNone(r['intraday'])
+        self.assertEqual(r['signal'], 'gray')
+        self.assertIsNone(r['bullish_score'])
         f = self.frame()
         f.loc['2025-08-27', 'Close'] = 100
         r = traffic_light(f, '한국', '2025-08-27T01:00Z', include_intraday=True)

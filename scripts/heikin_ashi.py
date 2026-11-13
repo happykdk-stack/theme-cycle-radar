@@ -1,8 +1,13 @@
 """Heikin-Ashi trend signals derived from exchange-session OHLC bars."""
 import numpy as np
 import pandas as pd
-from traffic_lights import (traffic_light, combine, bullish_score, green_history,
+from traffic_lights import (traffic_light, empty_signal, combine, bullish_score, green_history,
                             FREQUENCIES, CALENDARS, exchange_schedule)
+
+def empty_ha_signal():
+    result = empty_signal()
+    result['method'] = 'Heikin-Ashi'
+    return result
 
 def ha_candles(ohlc):
     """Canonical HA candles, recursively seeded with the first real candle."""
@@ -21,6 +26,7 @@ def ha_candles(ohlc):
 def ha_traffic_light(frame, market, now=None, include_intraday=False):
     """Recompute HA at each session without using future month/week candles."""
     baseline = traffic_light(frame, market, now=now, include_intraday=include_intraday)
+    baseline['method'] = 'Heikin-Ashi'
     if frame is None or frame.empty or baseline["asof"] is None:
         return baseline
     now = pd.Timestamp.now(tz="UTC") if now is None else pd.Timestamp(now)

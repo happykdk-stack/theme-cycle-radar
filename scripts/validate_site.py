@@ -13,7 +13,7 @@ assert data['themes']
 assert data['securities_etf']['ticker'] == '102970.KS'
 for theme in [*data['themes'], data['securities_etf']]:
     trend = theme['etf_trend']
-    assert trend['method'] == 'MA1'
+    assert trend['method'] == 'Heikin-Ashi'
     live = trend['intraday']
     if live is not None:
         assert live['provisional'] is True
@@ -27,6 +27,12 @@ for theme in [*data['themes'], data['securities_etf']]:
     assert set(trend['timeframes']) == {'monthly', 'weekly', 'daily'}
     for f in trend['timeframes'].values():
         assert f['state'] in ('up', 'down', 'mixed', 'insufficient')
+        if f['state'] != 'insufficient':
+            assert f['ha_open'] > 0 and f['ha_close'] > 0
+            expected = 'up' if f['ha_close'] > f['ha_open'] else 'down' if f['ha_close'] < f['ha_open'] else 'mixed'
+            assert f['state'] == expected
+            assert f['actual_open'] > 0 and f['actual_close'] > 0
+            assert f['actual_change_pct'] == round((f['actual_close'] / f['actual_open'] - 1) * 100, 2)
     if trend['last_changed']:
         assert trend['last_changed'] <= trend['asof']
     history = trend['green_history']
