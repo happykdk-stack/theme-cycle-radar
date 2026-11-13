@@ -55,6 +55,10 @@ jobs:
         run: python scripts/update_v4.py
 
       - name: Collect optional ETF PER observations
+        env:
+          ECOS_API_KEY: ${{ secrets.ECOS_API_KEY }}
+          ECOS_KOSPI_PER_STAT_CODE: ${{ vars.ECOS_KOSPI_PER_STAT_CODE }}
+          ECOS_KOSPI_PER_ITEM_CODE: ${{ vars.ECOS_KOSPI_PER_ITEM_CODE }}
         run: python scripts/per_data.py
 
       - name: Update short-term crash rebound scan
