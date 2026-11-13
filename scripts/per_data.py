@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from urllib.request import Request, urlopen
 import yfinance as yf
-from update import THEMES, ROOT
+from update import THEMES, ROOT, series_download
 
 OUT=ROOT/"site"/"per_history.json"
 PREVIOUS_URL="https://happykdk-stack.github.io/theme-cycle-radar/per_history.json"
@@ -35,7 +35,35 @@ def fetch_pe(ticker):
     # Not every ETF exposes a valid underlying portfolio P/E.
     return valid_pe(info.get("trailingPE"))
 
-def build(fetch=fetch_pe,prior=None,asof=None):
+def price_context(ticker, fetch_prices):
+    try:
+        frame=fetch_prices(ticker)
+        c=frame["Close"].astype(float).dropna()
+        if len(c)<25: return {"prices":[],"rebounds":[],"error":"가격 이력 부족"}
+        prices=[{"date":idx.date().isoformat(),"close":round(float(v),2)} for idx,v in c.tail(370).items()]
+        # Retrospective 20-session low followed by 5% gain within 20 sessions.
+        # Confirmation date is the first future close reaching the threshold.
+        lows=c<=c.shift(1).rolling(20).min()
+        events=[]
+        last=-100
+        for i in range(20,len(c)-1):
+            if not bool(lows.iloc[i]) or i-last<20:continue
+            base=float(c.iloc[i])
+            for j in range(i+1,min(i+21,len(c))):
+                if float(c.iloc[j])>=base*1.05:
+                    events.append({"low_date":c.index[i].date().isoformat(),
+                                   "confirmation_date":c.index[j].date().isoformat(),
+                                   "low_close":round(base,2),
+                                   "confirmation_close":round(float(c.iloc[j]),2),
+                                   "rise_pct":round((float(c.iloc[j])/base-1)*100,2),
+                                   "sessions":j-i})
+                    last=i
+                    break
+        return {"prices":prices,"rebounds":events[-25:],"error":None}
+    except Exception as exc:
+        return {"prices":[],"rebounds":[],"error":str(exc)[:160]}
+
+def build(fetch=fetch_pe,prior=None,asof=None,fetch_prices=series_download):
     date=asof or datetime.now(timezone.utc).date().isoformat()
     if prior is None:
         prior,history_error=previous_history()
@@ -61,13 +89,14 @@ def build(fetch=fetch_pe,prior=None,asof=None):
         history=sorted(unique.values(),key=lambda p:p["date"])[-MAX_POINTS:]
         if value is None and history:
             status="stale" if ticker not in FUTURES else "not_applicable"
+        context=price_context(ticker,fetch_prices)
         etfs[ticker]={"market":market,"theme":theme,"fund":fund,"ticker":ticker,
                       "pe":value,"status":status,"asof":date if value is not None else None,
-                      "history":history,"error":err,
+                      "history":history,"error":err,"price_context":context,
                       "source":"Yahoo Finance ETF quote trailingPE (provider methodology unverified)"}
-    return {"version":"1.0","generated_at_utc":datetime.now(timezone.utc).isoformat(timespec="seconds"),
+    return {"version":"1.1","generated_at_utc":datetime.now(timezone.utc).isoformat(timespec="seconds"),
             "history_source_error":history_error,"etfs":etfs,
-            "note":"PER values are optional, unverified ETF quote fields, not verified holdings-weighted P/E. Historical observations begin when collected. Missing values are not estimated."}
+            "note":"ETF PER observations start at collection; rebound events are retrospectively confirmed from price only, NOT PER-based predictions. No invented historical PER."}
 
 if __name__=="__main__":
     data=build()
