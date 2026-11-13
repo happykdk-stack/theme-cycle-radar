@@ -12,7 +12,7 @@
 </div>
 <section class="panel" id="per-panel" hidden><h2>ETF별 PER 및 관측 추이</h2><p class="muted small">PER은 금융정보 제공처가 ETF 시세에 표시한 값으로, 구성종목 가중 PER과 일치한다는 보장이 없습니다. 값이 없으면 N/A로 표시합니다. 과거 추이는 실제 수집한 날짜부터 축적하며, 원유 선물 ETF에는 기업 PER을 적용하지 않습니다.</p><div id="per-status" class="small muted">PER 데이터를 불러오는 중…</div><div class="tablewrap"><table><thead><tr><th>시장</th><th>ETF</th><th>PER</th><th>기준일</th><th>관측 기록</th><th>PER 추이</th></tr></thead><tbody id="per-rows"></tbody></table></div><div id="per-chart" class="small muted"></div></section>
 <div id="per-view" hidden>
-<section class="panel"><h2>PER 추이 · 주가 지수 · 반등 확인일</h2><p class="muted small">ETF 또는 국가별 종합주가지수를 선택하면 실제 수집된 PER 관측치와 가격지수(첫날=100)를 표시합니다. 반등 확인일은 과거 20거래일 저점 이후 20거래일 안에 5% 상승이 확인된 날로, 사후 검증 결과이며 미래 반등 예측이 아닙니다.</p>
+<section class="panel"><h2>실제 PER 추이 · 종합주가지수 · 반등 확인일</h2><p class="muted small">ETF 또는 국가별 종합주가지수를 선택하면 실제 수집된 PER 관측치와 실제 주가지수 또는 ETF 가격를 표시합니다. 반등 확인일은 과거 20거래일 저점 이후 20거래일 안에 5% 상승이 확인된 날로, 사후 검증 결과이며 미래 반등 예측이 아닙니다.</p>
 <div class="controls"><label for="per-select">ETF · 주요 주가지수 선택</label><select id="per-select" style="padding:8px;background:#203b59;color:white;border-radius:8px;max-width:100%"></select></div>
 <div id="per-summary" class="small muted">데이터를 불러오는 중…</div><div class="controls"><button id="per-period-all" type="button" class="selected">전체 기간</button><button id="per-period-90" type="button">최근 90일</button><button id="per-period-30" type="button">최근 30일</button></div><div id="per-plot" class="panel"></div>
 <div class="tablewrap"><table><thead><tr><th>과거 저점일</th><th>반등 확인일</th><th>저점 대비 상승률</th><th>소요일</th><th>저점 당시 PER</th></tr></thead><tbody id="per-rebounds"></tbody></table></div>
@@ -47,13 +47,14 @@ function renderPERDetail(){
   for(const [text,y] of [[format(hi),35],[format(lo),190]]){const t=create('text');t.setAttribute('x','2');t.setAttribute('y',String(y));t.setAttribute('fill','#c7d8ec');t.setAttribute('font-size','12');t.textContent=text;svg.append(t)}
   section.append(svg);const label=document.createElement('p');label.className='small muted';label.textContent=dates[0]+' → '+dates[dates.length-1]+' · 시작 '+format(values[0])+' / 현재 '+format(values[values.length-1]);section.append(label);return section;
  };
+ // PER is the primary chart. Never infer PER from a normalized price index.
+ plot.append(draw(points.map(p=>p.pe),points.map(p=>p.date),'#ffd38a','실제 PER 추이 (배)',v=>v.toFixed(2)+'배'));
  if(prices.length>=2){
-  const base=prices[0].close;
-  const normalized=prices.map(p=>p.close/base*100);
-  plot.append(draw(normalized,prices.map(p=>p.date),'#74e6b6','가격 추이 (선택 기간 첫날=100, 지수·ETF 공통)',v=>v.toFixed(1)));
- }else{const p=document.createElement('p');p.textContent='주가 지수 이력 부족: '+(pc.error||'');plot.append(p)}
- plot.append(draw(points.map(p=>p.pe),points.map(p=>p.date),'#ffd38a','PER 관측 추이 (배)',v=>v.toFixed(2)+'배'));
- const notice=document.createElement('p');notice.className='small muted';notice.textContent='두 그래프는 각각 독립 축입니다. PER이 없는 날짜는 보간하지 않습니다. 반등 확인은 주가만으로 사후 계산한 결과이며 PER 기반 예측이 아닙니다.';plot.append(notice);
+  plot.append(draw(prices.map(p=>p.close),prices.map(p=>p.date),'#74e6b6',
+   x.kind==='index'?'실제 종합주가지수 (포인트)':'실제 ETF 가격 (거래 통화)',
+   v=>Number(v).toLocaleString('ko-KR',{maximumFractionDigits:2})));
+ }else{const p=document.createElement('p');p.textContent='실제 주가지수/가격 이력 부족: '+(pc.error||'');plot.append(p)}
+ const notice=document.createElement('p');notice.className='small muted';notice.textContent='PER은 실제 제공된 배수만 표시합니다. 종합주가지수는 실제 포인트, ETF는 실제 가격으로 표시하며 각각 독립 축입니다. PER이 없는 날짜는 보간하지 않습니다. 반등 확인은 주가만으로 사후 계산한 결과이며 PER 기반 예측이 아닙니다.';plot.append(notice);
  for(const e of [...(pc.rebounds||[])].reverse().filter(e=>!startDate||e.confirmation_date>=startDate)){
   const tr=document.createElement('tr'),known=allPoints.find(p=>p.date===e.low_date);
   for(const v of [e.low_date,e.confirmation_date,'+'+e.rise_pct+'%',e.sessions+'거래일',known?known.pe+'배':'N/A']){const td=document.createElement('td');td.textContent=v;tr.append(td)}tbody.append(tr);
