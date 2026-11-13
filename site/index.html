@@ -35,7 +35,7 @@ function renderPERDetail(){
  const startDate=perWindow&&allPrices.length?allPrices[Math.max(0,allPrices.length-perWindow)].date:null;
  const prices=startDate?allPrices.filter(p=>p.date>=startDate):allPrices;
  const points=startDate?allPoints.filter(p=>p.date>=startDate):allPoints;
- summary.textContent=x.theme+(x.kind==='index'?' · 종합주가지수':' · ETF')+' · 현재 PER '+(x.pe==null?'N/A (검증된 PER 자료 미연결)':x.pe+'배')+' · PER 관측 '+allPoints.length+'건 · 가격 '+allPrices.length+'거래일 · PER 출처: Yahoo Finance ETF quote (산출 방식 미검증) · 종합지수 PER은 별도 자료 필요';
+ summary.textContent=x.theme+(x.kind==='index'?' · 종합주가지수':' · ETF')+' · 현재 PER '+(x.pe==null?'N/A (검증된 PER 자료 미연결)':x.pe+'배')+' · PER 관측 '+allPoints.length+'건 · 가격 '+allPrices.length+'거래일 · PER 출처: '+(x.source||'자료 미연결')+' · 관측 기준일 '+(x.asof||'없음')';
  plot.replaceChildren();tbody.replaceChildren();
  const create=tag=>document.createElementNS('http://www.w3.org/2000/svg',tag);
  const showPE=document.getElementById('per-show-pe')?.checked!==false;
