@@ -11,6 +11,11 @@ OUT=ROOT/"site"/"per_history.json"
 PREVIOUS_URL="https://happykdk-stack.github.io/theme-cycle-radar/per_history.json"
 FUTURES={"261220.KS","USO"}
 MAX_POINTS=370
+INDICES=[
+ ("한국","코스피","^KS11"),("한국","코스닥","^KQ11"),("한국","코스피200","^KS200"),
+ ("미국","S&P 500","^GSPC"),("미국","나스닥 종합","^IXIC"),
+ ("미국","다우존스 산업평균","^DJI"),("미국","러셀 2000","^RUT")
+]
 
 def valid_pe(value):
     try:
@@ -94,9 +99,16 @@ def build(fetch=fetch_pe,prior=None,asof=None,fetch_prices=series_download):
                       "pe":value,"status":status,"asof":date if value is not None else None,
                       "history":history,"error":err,"price_context":context,
                       "source":"Yahoo Finance ETF quote trailingPE (provider methodology unverified)"}
-    return {"version":"1.1","generated_at_utc":datetime.now(timezone.utc).isoformat(timespec="seconds"),
-            "history_source_error":history_error,"etfs":etfs,
-            "note":"ETF PER observations start at collection; rebound events are retrospectively confirmed from price only, NOT PER-based predictions. No invented historical PER."}
+    indices={}
+    for market,name,ticker in INDICES:
+        ctx=price_context(ticker,fetch_prices)
+        indices[ticker]={"market":market,"theme":name,"fund":name,"ticker":ticker,
+                         "kind":"index","pe":None,"status":"unavailable",
+                         "asof":None,"history":[],"price_context":ctx,
+                         "source":"Yahoo Finance index close; index P/E unavailable from this feed"}
+    return {"version":"1.2","generated_at_utc":datetime.now(timezone.utc).isoformat(timespec="seconds"),
+            "history_source_error":history_error,"etfs":etfs,"indices":indices,
+            "note":"ETF PER observations start at collection. Index prices are genuine index levels. Index P/E is N/A until a separately validated index valuation source is connected. Rebound events are retrospective, not predictions."}
 
 if __name__=="__main__":
     data=build()
