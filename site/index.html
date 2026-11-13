@@ -12,9 +12,9 @@
 </div>
 <section class="panel" id="per-panel" hidden><h2>ETF별 PER 및 관측 추이</h2><p class="muted small">PER은 금융정보 제공처가 ETF 시세에 표시한 값으로, 구성종목 가중 PER과 일치한다는 보장이 없습니다. 값이 없으면 N/A로 표시합니다. 과거 추이는 실제 수집한 날짜부터 축적하며, 원유 선물 ETF에는 기업 PER을 적용하지 않습니다.</p><div id="per-status" class="small muted">PER 데이터를 불러오는 중…</div><div class="tablewrap"><table><thead><tr><th>시장</th><th>ETF</th><th>PER</th><th>기준일</th><th>관측 기록</th><th>PER 추이</th></tr></thead><tbody id="per-rows"></tbody></table></div><div id="per-chart" class="small muted"></div></section>
 <div id="per-view" hidden>
-<section class="panel"><h2>실제 PER 추이 · 종합주가지수 · 반등 확인일</h2><p class="muted small">ETF 또는 국가별 종합주가지수를 선택하면 실제 수집된 PER 관측치와 실제 주가지수 또는 ETF 가격를 표시합니다. 반등 확인일은 과거 20거래일 저점 이후 20거래일 안에 5% 상승이 확인된 날로, 사후 검증 결과이며 미래 반등 예측이 아닙니다.</p>
+<section class="panel"><h2>실제 PER 추이 · 종합주가지수 · 반등 확인일</h2><p class="muted small">ETF 또는 국가별 종합주가지수를 선택하면 실제 수집된 PER 관측치와 실제 주가지수 또는 ETF 가격을 표시합니다. 반등 확인일은 과거 20거래일 저점 이후 20거래일 안에 5% 상승이 확인된 날로, 사후 검증 결과이며 미래 반등 예측이 아닙니다.</p>
 <div class="controls"><label for="per-select">ETF · 주요 주가지수 선택</label><select id="per-select" style="padding:8px;background:#203b59;color:white;border-radius:8px;max-width:100%"></select></div>
-<div id="per-summary" class="small muted">데이터를 불러오는 중…</div><div class="controls"><button id="per-period-all" type="button" class="selected">전체 기간</button><button id="per-period-90" type="button">최근 90일</button><button id="per-period-30" type="button">최근 30일</button></div><div id="per-plot" class="panel"></div>
+<div class="controls" aria-label="PER 표시 항목"><label><input id="per-show-pe" type="checkbox" checked> 실제 PER</label><label><input id="per-show-price" type="checkbox" checked> 주가지수·ETF 가격</label></div><div id="per-summary" class="small muted">데이터를 불러오는 중…</div><div class="controls"><button id="per-period-all" type="button" class="selected">전체 기간</button><button id="per-period-90" type="button">최근 90일</button><button id="per-period-30" type="button">최근 30일</button></div><div id="per-plot" class="panel"></div>
 <div class="tablewrap"><table><thead><tr><th>과거 저점일</th><th>반등 확인일</th><th>저점 대비 상승률</th><th>소요일</th><th>저점 당시 PER</th></tr></thead><tbody id="per-rebounds"></tbody></table></div>
 <p class="small muted">PER 관측치가 없으면 N/A로 표시합니다. ETF PER과 시장지수 PER은 산출 방식이 다르며, 선물 ETF에는 PER을 적용하지 않습니다.</p></section></div>
 <div id="short-view" hidden>
@@ -37,24 +37,41 @@ function renderPERDetail(){
  const points=startDate?allPoints.filter(p=>p.date>=startDate):allPoints;
  summary.textContent=x.theme+(x.kind==='index'?' · 종합주가지수':' · ETF')+' · 현재 PER '+(x.pe==null?'N/A (검증된 PER 자료 미연결)':x.pe+'배')+' · PER 관측 '+allPoints.length+'건 · 가격 '+allPrices.length+'거래일 · PER 출처: Yahoo Finance ETF quote (산출 방식 미검증) · 종합지수 PER은 별도 자료 필요';
  plot.replaceChildren();tbody.replaceChildren();
- const create=(tag)=>document.createElementNS('http://www.w3.org/2000/svg',tag);
- const draw=(values,dates,color,heading,format)=>{
-  const section=document.createElement('div'),title=document.createElement('h3');title.textContent=heading;section.append(title);
-  if(values.length<2){const p=document.createElement('p');p.textContent='추이를 그릴 관측치가 부족합니다. 최소 2개가 필요합니다.';section.append(p);return section;}
-  const svg=create('svg');svg.setAttribute('viewBox','0 0 700 220');svg.setAttribute('width','100%');svg.setAttribute('role','img');svg.setAttribute('aria-label',heading);
-  const lo=Math.min(...values),hi=Math.max(...values),span=hi-lo||1;
-  const poly=create('polyline');poly.setAttribute('points',values.map((v,i)=>(48+615*i/(values.length-1))+','+(175-135*(v-lo)/span)).join(' '));poly.setAttribute('fill','none');poly.setAttribute('stroke',color);poly.setAttribute('stroke-width','2.5');svg.append(poly);
-  for(const [text,y] of [[format(hi),35],[format(lo),190]]){const t=create('text');t.setAttribute('x','2');t.setAttribute('y',String(y));t.setAttribute('fill','#c7d8ec');t.setAttribute('font-size','12');t.textContent=text;svg.append(t)}
-  section.append(svg);const label=document.createElement('p');label.className='small muted';label.textContent=dates[0]+' → '+dates[dates.length-1]+' · 시작 '+format(values[0])+' / 현재 '+format(values[values.length-1]);section.append(label);return section;
- };
- // PER is the primary chart. Never infer PER from a normalized price index.
- plot.append(draw(points.map(p=>p.pe),points.map(p=>p.date),'#ffd38a','실제 PER 추이 (배)',v=>v.toFixed(2)+'배'));
- if(prices.length>=2){
-  plot.append(draw(prices.map(p=>p.close),prices.map(p=>p.date),'#74e6b6',
-   x.kind==='index'?'실제 종합주가지수 (포인트)':'실제 ETF 가격 (거래 통화)',
-   v=>Number(v).toLocaleString('ko-KR',{maximumFractionDigits:2})));
- }else{const p=document.createElement('p');p.textContent='실제 주가지수/가격 이력 부족: '+(pc.error||'');plot.append(p)}
- const notice=document.createElement('p');notice.className='small muted';notice.textContent='PER은 실제 제공된 배수만 표시합니다. 종합주가지수는 실제 포인트, ETF는 실제 가격으로 표시하며 각각 독립 축입니다. PER이 없는 날짜는 보간하지 않습니다. 반등 확인은 주가만으로 사후 계산한 결과이며 PER 기반 예측이 아닙니다.';plot.append(notice);
+ const create=tag=>document.createElementNS('http://www.w3.org/2000/svg',tag);
+ const showPE=document.getElementById('per-show-pe')?.checked!==false;
+ const showPrice=document.getElementById('per-show-price')?.checked!==false;
+ const peSeries=points.filter(p=>Number.isFinite(p.pe)).map(p=>({date:p.date,value:p.pe}));
+ const priceSeries=prices.filter(p=>Number.isFinite(p.close)).map(p=>({date:p.date,value:p.close}));
+ const activePE=showPE&&peSeries.length>=2,activePrice=showPrice&&priceSeries.length>=2;
+ const chartTitle=document.createElement('h3');chartTitle.textContent='PER · '+(x.kind==='index'?'종합주가지수':'ETF 가격')+' 통합 차트';plot.append(chartTitle);
+ if(!activePE&&!activePrice){const p=document.createElement('p');p.textContent='선택한 항목에 표시 가능한 관측값이 없습니다. PER은 최소 2개의 실제 관측값이 필요합니다.';plot.append(p)}
+ else {
+  const allDates=[...(activePE?peSeries:[]),...(activePrice?priceSeries:[])].map(p=>p.date).sort();
+  const from=Date.parse(allDates[0]),to=Date.parse(allDates[allDates.length-1]),span=Math.max(to-from,1);
+  const svg=create('svg');svg.setAttribute('viewBox','0 0 900 350');svg.setAttribute('width','100%');svg.setAttribute('role','img');svg.setAttribute('aria-label','실제 PER 왼쪽 축, 지수 또는 ETF 가격 오른쪽 축');
+  const add=(tag,attrs,text)=>{const el=create(tag);for(const [k,v] of Object.entries(attrs||{}))el.setAttribute(k,String(v));if(text!==undefined)el.textContent=text;svg.append(el);return el};
+  const fmt=v=>Number(v).toLocaleString('ko-KR',{maximumFractionDigits:2});
+  const xPos=date=>65+755*(Date.parse(date)-from)/span;
+  const scale=series=>{const values=series.map(p=>p.value),lo=Math.min(...values),hi=Math.max(...values),pad=(hi-lo||Math.max(hi*.1,1))*.08;return {min:Math.max(0,lo-pad),max:hi+pad}};
+  const peRange=activePE?scale(peSeries):null,priceRange=activePrice?scale(priceSeries):null;
+  const yPos=(value,range)=>290-235*(value-range.min)/(range.max-range.min);
+  for(let k=0;k<=4;k++){
+   const y=290-235*k/4;add('line',{x1:65,y1:y,x2:820,y2:y,stroke:'#42536b','stroke-opacity':'.5'});
+   if(activePE)add('text',{x:57,y:y+4,'text-anchor':'end',fill:'#f1a9c5','font-size':12},fmt(peRange.min+(peRange.max-peRange.min)*k)+'x');
+   if(activePrice)add('text',{x:827,y:y+4,fill:'#8ab9ff','font-size':12},fmt(priceRange.min+(priceRange.max-priceRange.min)*k));
+  }
+  if(activePE){add('polyline',{points:peSeries.map(p=>xPos(p.date)+','+yPos(p.value,peRange)).join(' '),fill:'none',stroke:'#f1a9c5','stroke-width':2.5});}
+  if(activePrice){add('polyline',{points:priceSeries.map(p=>xPos(p.date)+','+yPos(p.value,priceRange)).join(' '),fill:'none',stroke:'#8ab9ff','stroke-width':2.5});}
+  for(let k=0;k<=4;k++){const d=new Date(from+(to-from)*k/4).toISOString().slice(0,10);add('text',{x:65+755*k/4,y:315,'text-anchor':'middle',fill:'#9aadc8','font-size':12},d)}
+  const markerDates=(pc.rebounds||[]).map(e=>e.confirmation_date).filter(d=>Date.parse(d)>=from&&Date.parse(d)<=to);
+  if(activePrice)for(const d of markerDates){const p=priceSeries.find(z=>z.date===d);if(p)add('circle',{cx:xPos(d),cy:yPos(p.value,priceRange),r:4,fill:'#ffd38a'})}
+  plot.append(svg);
+  const legend=document.createElement('p');legend.className='small muted';legend.textContent=(activePE?'분홍: 실제 PER(왼쪽 축) · ':'')+(activePrice?'파랑: 실제 지수/ETF 가격(오른쪽 축) · ':'')+'노랑 점: 사후 반등 확인일';plot.append(legend);
+  const tip=document.createElement('p');tip.className='small muted';tip.textContent='마우스 대신 아래 날짜별 관측 목록으로 실제 값을 확인할 수 있습니다. PER 미관측 구간은 채우지 않습니다.';plot.append(tip);
+  const details=document.createElement('details'),summary=document.createElement('summary');summary.textContent='실제 PER 관측 날짜와 값 ('+peSeries.length+'개)';details.append(summary);
+  const list=document.createElement('div');list.className='small muted';list.textContent=peSeries.length?peSeries.map(p=>p.date+' '+fmt(p.value)+'배').join(' · '):'실제 PER 관측값 없음';details.append(list);plot.append(details);
+ }
+ const notice=document.createElement('p');notice.className='small muted';notice.textContent='실제 PER과 지수는 서로 다른 Y축을 사용합니다. 후행·당해·차년도 예상 PER은 검증된 개별 시계열이 연결되기 전에는 표시하지 않습니다. 반등은 가격 기반 사후 판정이며 PER로 예측한 결과가 아닙니다.';plot.append(notice);
  for(const e of [...(pc.rebounds||[])].reverse().filter(e=>!startDate||e.confirmation_date>=startDate)){
   const tr=document.createElement('tr'),known=allPoints.find(p=>p.date===e.low_date);
   for(const v of [e.low_date,e.confirmation_date,'+'+e.rise_pct+'%',e.sessions+'거래일',known?known.pe+'배':'N/A']){const td=document.createElement('td');td.textContent=v;tr.append(td)}tbody.append(tr);
@@ -156,7 +173,7 @@ function renderShort(){
 async function loadShort(){try{const r=await fetch('./short_term.json?t='+Date.now(),{cache:'no-store'});if(!r.ok)throw Error('HTTP '+r.status);shortData=await r.json();renderShort()}catch(e){$('short-status').textContent='단기 데이터 조회 실패: '+e.message}}
 function selectView(view){$('long-view').hidden=view!=='long';$('short-view').hidden=view!=='short';$('per-view').hidden=view!=='per';$('per-panel').hidden=true;$('long-errors').hidden=view!=='long';$('long-tab').classList.toggle('selected',view==='long');$('short-tab').classList.toggle('selected',view==='short');$('per-tab').classList.toggle('selected',view==='per');if(view==='per')renderPERDetail()}
 $('long-tab').addEventListener('click',()=>selectView('long'));
-$('short-tab').addEventListener('click',()=>{selectView('short');loadShort()});$('per-tab').addEventListener('click',()=>selectView('per'));$('per-select').addEventListener('change',e=>{selectedPER=e.target.value;renderPERDetail()});for(const [id,days] of [['per-period-all',0],['per-period-90',90],['per-period-30',30]])document.getElementById(id).addEventListener('click',()=>{perWindow=days;for(const key of ['per-period-all','per-period-90','per-period-30'])document.getElementById(key).classList.toggle('selected',key===id);renderPERDetail()});
+$('short-tab').addEventListener('click',()=>{selectView('short');loadShort()});$('per-tab').addEventListener('click',()=>selectView('per'));$('per-select').addEventListener('change',e=>{selectedPER=e.target.value;renderPERDetail()});for(const id of ['per-show-pe','per-show-price'])document.getElementById(id).addEventListener('change',renderPERDetail);for(const [id,days] of [['per-period-all',0],['per-period-90',90],['per-period-30',30]])document.getElementById(id).addEventListener('click',()=>{perWindow=days;for(const key of ['per-period-all','per-period-90','per-period-30'])document.getElementById(key).classList.toggle('selected',key===id);renderPERDetail()});
 async function load(){try{const r=await fetch('./data.json?t='+Date.now(),{cache:'no-store'});if(!r.ok)throw Error('HTTP '+r.status);data=await r.json();const stamp=new Date(data.generated_at_utc);if(data.version!=='4.2'){$('status').textContent='데이터 버전 '+(data.version||'미상')+' · 최신 데이터 배포 필요';return;}$('status').textContent='ETF 신호등 · '+data.status+' · '+stamp.toLocaleString('ko-KR',{timeZone:'Asia/Seoul'})+' KST · '+data.themes.length+'개 테마'+(data.etf_trend_version?' · ETF 신호등 데이터 '+data.etf_trend_version:' · ETF 신호등 데이터 미생성')+(Date.now()-stamp.getTime()>36*3600000?' · 데이터 지연 주의':'');render()}catch(e){$('status').textContent='데이터 조회 실패: '+e.message}}
 document.querySelectorAll('[data-market]').forEach(b=>b.addEventListener('click',()=>{market=b.dataset.market;document.querySelectorAll('[data-market]').forEach(x=>x.classList.toggle('selected',x===b));render()}));$('reload').addEventListener('click',()=>{load();loadPER();if(!$('short-view').hidden)loadShort()});
 setInterval(()=>{if(document.hidden)return;load();loadPER();if(!$('short-view').hidden)loadShort()},10*60*1000);
