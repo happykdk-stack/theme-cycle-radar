@@ -54,6 +54,9 @@ jobs:
       - name: Update market data
         run: python scripts/update_v4.py
 
+      - name: Collect optional ETF PER observations
+        run: python scripts/per_data.py
+
       - name: Update short-term crash rebound scan
         run: python scripts/short_term.py
 
