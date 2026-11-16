@@ -37,6 +37,12 @@ function renderPERDetail(){
  const points=startDate?allPoints.filter(p=>p.date>=startDate):allPoints;
  summary.textContent=x.theme+(x.kind==='index'?' · 종합주가지수':' · ETF')+' · 현재 PER '+(x.pe==null?'N/A (검증된 PER 자료 미연결)':x.pe+'배')+' · PER 관측 '+allPoints.length+'건 · 가격 '+allPrices.length+'거래일 · PER 출처: '+(x.source||'자료 미연결')+' · 관측 기준일 '+(x.asof||'없음');
  plot.replaceChildren();tbody.replaceChildren();
+ if(allPoints.length<2){
+  const warning=document.createElement('p');warning.className='warn';
+  const why=x.pe_error||(x.kind==='index'?(perData?.index_pe_errors?.ECOS||'해당 지수의 검증된 과거 PER 공급원이 연결되지 않았습니다.'):(x.error||'PER 제공처에서 유효한 값을 받지 못했습니다.'));
+  warning.textContent='PER 그래프 미표시 원인: '+why+' · 실제 PER 관측값 '+allPoints.length+'개 (선 그래프 최소 2개). 주가 데이터만으로 PER을 생성하지 않습니다.';
+  plot.append(warning);
+ }
  const create=tag=>document.createElementNS('http://www.w3.org/2000/svg',tag);
  const showPE=document.getElementById('per-show-pe')?.checked!==false;
  const showPrice=document.getElementById('per-show-price')?.checked!==false;
@@ -83,7 +89,7 @@ function renderPER(){
  if(!rows||!status||!chart)return;
  rows.replaceChildren();chart.replaceChildren();
  if(!perData){status.textContent='PER 데이터 없음 또는 아직 배포되지 않음';renderPERDetail();return;}
- status.textContent='PER 출처: Yahoo Finance ETF quote trailingPE · 제공처 산출 방식 미검증 · 수집일 이후 관측치만 기록';
+ status.textContent='PER 수집 결과 · 지수 '+Object.values(perData.indices||{}).filter(x=>(x.history||[]).length>=2).length+'/'+Object.keys(perData.indices||{}).length+'개에 그래프용 PER 있음 · ETF '+Object.values(perData.etfs||{}).filter(x=>(x.history||[]).length>=2).length+'/'+Object.keys(perData.etfs||{}).length+'개 · 실제 관측값 부족 시 원인을 표시합니다.';
  for(const x of Object.values(perData.etfs||{}).filter(x=>market==='전체'||x.market===market)){
   const tr=document.createElement('tr');
   const points=x.history||[];
