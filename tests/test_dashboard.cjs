@@ -13,20 +13,15 @@ test('main navigation includes independent PER analysis',()=>{
  assert.match(html,/id="per-view"/);
  assert.match(html,/id="per-select"/);
 });
-test('PER and index charts render in separate panels',()=>{
- assert.match(html,/id="per-plot"/);
- assert.match(html,/id="price-plot"/);
- assert.match(html,/밸류에이션 전용 그래프/);
- assert.match(html,/종합주가지수 · ETF 가격 그래프/);
- assert.match(html,/peSeries/);
- assert.match(html,/priceSeries/);
- assert.match(html,/x\.source/);
- assert.match(html,/id="valuation-metric"/);
- assert.doesNotMatch(html,/const normalized=prices\.map/);
+test('country index PER table replaces valuation charts',()=>{
+ assert.match(html,/id="per-only-rows"/);
+ assert.match(html,/국가별 종합주가지수 PER/);
+ assert.doesNotMatch(html,/id="per-plot"/);
+ assert.doesNotMatch(html,/id="price-plot"/);
 });
-test('PER chart does not interpolate missing observations',()=>{
- assert.match(html,/PER 원자료가 없어 표시할 수 없습니다/);
- assert.match(html,/series.length>=2/);
+test('missing PER values are explicit',()=>{
+ assert.match(html,/검증된 PER 데이터 미연결/);
+ assert.match(html,/N\/A/);
 });
 test('market traffic lights and refresh remain available',()=>{
  assert.match(html,/id="theme-scores"/);
