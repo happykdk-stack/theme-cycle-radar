@@ -35,12 +35,12 @@ function renderPERDetail(){
  const startDate=perWindow&&allPrices.length?allPrices[Math.max(0,allPrices.length-perWindow)].date:null;
  const prices=startDate?allPrices.filter(p=>p.date>=startDate):allPrices;
  const points=startDate?allPoints.filter(p=>p.date>=startDate):allPoints;
- summary.textContent=x.theme+(x.kind==='index'?' · 종합주가지수':' · ETF')+' · 현재 PER '+(x.pe==null?'N/A (검증된 PER 자료 미연결)':x.pe+'배')+' · PER 관측 '+allPoints.length+'건 · 가격 '+allPrices.length+'거래일 · PER 출처: '+(x.source||'자료 미연결')+' · 관측 기준일 '+(x.asof||'없음');
+ summary.textContent=x.theme+(x.kind==='index'?' · 종합주가지수':' · ETF')+' · 최근 확인 PER '+(x.pe==null?'N/A (검증된 PER 자료 미연결)':x.pe+'배')+' · PER 관측 '+allPoints.length+'건 · 가격 '+allPrices.length+'거래일 · PER 출처: '+(x.source||'자료 미연결')+' · 관측 기준일 '+(x.asof||'없음');
  plot.replaceChildren();tbody.replaceChildren();
  if(allPoints.length<2){
   const warning=document.createElement('p');warning.className='warn';
-  const why=x.pe_error||(x.kind==='index'?(perData?.index_pe_errors?.ECOS||'해당 지수의 검증된 과거 PER 공급원이 연결되지 않았습니다.'):(x.error||'PER 제공처에서 유효한 값을 받지 못했습니다.'));
-  warning.textContent='PER 그래프 미표시 원인: '+why+' · 실제 PER 관측값 '+allPoints.length+'개 (선 그래프 최소 2개). 주가 데이터만으로 PER을 생성하지 않습니다.';
+  const why=x.pe_error||(x.kind==='index'?(x.ticker==='^KS11'?(perData?.index_pe_errors?.ECOS||'코스피 공식 PER 데이터 연결 미설정'):'해당 지수의 검증된 과거 PER 공급원이 연결되지 않았습니다.'):(x.error||'PER 제공처에서 유효한 값을 받지 못했습니다.'));
+  warning.textContent='실제 PER 데이터 상태: '+why+' · 관측값 '+allPoints.length+'개. 관측값 1개면 점만 표시하며 2개 이상부터 선을 표시합니다. 가격으로 PER을 만들지 않습니다.';
   plot.append(warning);
  }
  const create=tag=>document.createElementNS('http://www.w3.org/2000/svg',tag);
@@ -48,9 +48,9 @@ function renderPERDetail(){
  const showPrice=document.getElementById('per-show-price')?.checked!==false;
  const peSeries=points.filter(p=>Number.isFinite(p.pe)).map(p=>({date:p.date,value:p.pe}));
  const priceSeries=prices.filter(p=>Number.isFinite(p.close)).map(p=>({date:p.date,value:p.close}));
- const activePE=showPE&&peSeries.length>=2,activePrice=showPrice&&priceSeries.length>=2;
+ const activePE=showPE&&peSeries.length>=1,activePrice=showPrice&&priceSeries.length>=2;
  const chartTitle=document.createElement('h3');chartTitle.textContent='PER · '+(x.kind==='index'?'종합주가지수':'ETF 가격')+' 통합 차트';plot.append(chartTitle);
- if(!activePE&&!activePrice){const p=document.createElement('p');p.textContent='선택한 항목에 표시 가능한 관측값이 없습니다. PER은 최소 2개의 실제 관측값이 필요합니다.';plot.append(p)}
+ if(!activePE&&!activePrice){const p=document.createElement('p');p.textContent='선택한 항목에 실제 관측값이 없습니다. PER을 체크해도 원자료가 없으면 그래프가 나타나지 않습니다.';plot.append(p)}
  else {
   const allDates=[...(activePE?peSeries:[]),...(activePrice?priceSeries:[])].map(p=>p.date).sort();
   const from=Date.parse(allDates[0]),to=Date.parse(allDates[allDates.length-1]),span=Math.max(to-from,1);
@@ -66,7 +66,7 @@ function renderPERDetail(){
    if(activePE)add('text',{x:57,y:y+4,'text-anchor':'end',fill:'#f1a9c5','font-size':12},fmt(peRange.min+(peRange.max-peRange.min)*k)+'x');
    if(activePrice)add('text',{x:827,y:y+4,fill:'#8ab9ff','font-size':12},fmt(priceRange.min+(priceRange.max-priceRange.min)*k));
   }
-  if(activePE){add('polyline',{points:peSeries.map(p=>xPos(p.date)+','+yPos(p.value,peRange)).join(' '),fill:'none',stroke:'#f1a9c5','stroke-width':2.5});}
+  if(activePE){if(peSeries.length>=2)add('polyline',{points:peSeries.map(p=>xPos(p.date)+','+yPos(p.value,peRange)).join(' '),fill:'none',stroke:'#f1a9c5','stroke-width':2.5});for(const p of peSeries)add('circle',{cx:xPos(p.date),cy:yPos(p.value,peRange),r:peSeries.length===1?5:2.5,fill:'#f1a9c5'});}
   if(activePrice){add('polyline',{points:priceSeries.map(p=>xPos(p.date)+','+yPos(p.value,priceRange)).join(' '),fill:'none',stroke:'#8ab9ff','stroke-width':2.5});}
   for(let k=0;k<=4;k++){const d=new Date(from+(to-from)*k/4).toISOString().slice(0,10);add('text',{x:65+755*k/4,y:315,'text-anchor':'middle',fill:'#9aadc8','font-size':12},d)}
   const markerDates=(pc.rebounds||[]).map(e=>e.confirmation_date).filter(d=>Date.parse(d)>=from&&Date.parse(d)<=to);
