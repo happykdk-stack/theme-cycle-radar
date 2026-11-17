@@ -12,11 +12,14 @@ test('main navigation includes independent PER analysis',()=>{
  assert.match(html,/id="per-tab"/);
  assert.match(html,/id="per-view"/);
 });
-test('country index PER table replaces valuation charts',()=>{
+test('country PER table and independent index chart are present',()=>{
  assert.match(html,/id="per-only-rows"/);
  assert.match(html,/국가별 종합주가지수 PER/);
  assert.doesNotMatch(html,/id="per-plot"/);
  assert.doesNotMatch(html,/id="price-plot"/);
+ assert.match(html,/id="index-price-chart"/);
+ assert.match(html,/id="index-chart-select"/);
+ assert.match(html,/renderIndexChart/);
 });
 test('missing PER values are explicit',()=>{
  assert.match(html,/검증된 PER 데이터 미연결/);

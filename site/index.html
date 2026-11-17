@@ -12,10 +12,12 @@
 </div>
 <section class="panel" id="per-panel" hidden><h2>ETF별 PER 및 관측 추이</h2><p class="muted small">PER은 금융정보 제공처가 ETF 시세에 표시한 값으로, 구성종목 가중 PER과 일치한다는 보장이 없습니다. 값이 없으면 N/A로 표시합니다. 과거 추이는 실제 수집한 날짜부터 축적하며, 원유 선물 ETF에는 기업 PER을 적용하지 않습니다.</p><div id="per-status" class="small muted">PER 데이터를 불러오는 중…</div><div class="tablewrap"><table><thead><tr><th>시장</th><th>ETF</th><th>PER</th><th>기준일</th><th>관측 기록</th><th>PER 추이</th></tr></thead><tbody id="per-rows"></tbody></table></div><div id="per-chart" class="small muted"></div></section>
 <div id="per-view" hidden>
-<section class="panel"><h2>국가별 종합주가지수 PER</h2>
-<p class="small muted">그래프 없이 PER 수치만 표시합니다. 날짜·출처·관측 상태를 함께 표시하며 실제 수집값이 없으면 N/A로 표시합니다. 서로 다른 지수의 PER 산출 기준은 다를 수 있습니다.</p>
+<section class="panel"><h2>국가별 주가지수 · PER</h2>
+<p class="small muted">주가지수는 실제 포인트 그래프로, PER은 별도 숫자 표로 표시합니다. PER 자료가 없어도 지수 그래프는 독립적으로 작동합니다.</p>
 <div class="controls"><button id="per-only-all" class="selected" type="button">전체</button><button id="per-only-kr" type="button">🇰🇷 한국</button><button id="per-only-us" type="button">🇺🇸 미국</button></div>
-<div id="per-only-status" class="small muted" aria-live="polite">PER 자료를 불러오는 중…</div>
+<div class="controls"><label for="index-chart-select">지수 그래프 선택</label><select id="index-chart-select" style="padding:8px;background:#203b59;color:white;border-radius:8px"></select><label for="index-chart-period">기간</label><select id="index-chart-period" style="padding:8px;background:#203b59;color:white;border-radius:8px"><option value="22">1개월</option><option value="66">3개월</option><option value="260" selected>1년</option></select></div>
+<div id="index-chart-status" class="small muted">지수 가격을 불러오는 중…</div><div id="index-price-chart" class="panel" aria-live="polite"></div>
+<h3>국가별 PER 수치</h3><div id="per-only-status" class="small muted" aria-live="polite">PER 자료를 불러오는 중…</div>
 <div class="tablewrap"><table><thead><tr><th>국가</th><th>종합주가지수</th><th>PER (배)</th><th>기준일</th><th>자료 상태·출처</th></tr></thead><tbody id="per-only-rows"></tbody></table></div>
 <p class="small muted">가장 최근 확인된 후행 PER 관측값입니다. 오래된 값은 현재 PER로 해석하지 마세요. 추정치와 확정치는 구분하며, 자료가 없으면 N/A입니다.</p>
 </section></div>
@@ -27,6 +29,30 @@
 let perData=null;let selectedPER=null;let perWindow=0;let valuationMetric='pe';
 
 let perCountry='전체';
+let selectedIndexTicker='^KS11',indexPeriod=260;
+function renderIndexChart(){
+ const select=document.getElementById('index-chart-select'),plot=document.getElementById('index-price-chart'),status=document.getElementById('index-chart-status');
+ if(!select||!plot||!status)return;
+ plot.replaceChildren();
+ const indices=Object.values(perData?.indices||{});
+ if(!indices.length){status.textContent='지수 가격 데이터 파일을 불러오지 못했습니다.';return;}
+ if(select.options.length!==indices.length){select.replaceChildren();for(const item of indices){const opt=document.createElement('option');opt.value=item.ticker;opt.textContent=item.market+' · '+item.theme;select.append(opt)}}
+ if(!indices.some(x=>x.ticker===selectedIndexTicker))selectedIndexTicker=indices[0].ticker;
+ select.value=selectedIndexTicker;
+ const item=indices.find(x=>x.ticker===selectedIndexTicker),all=(item.price_context?.prices||[]).filter(p=>Number.isFinite(p.close)&&typeof p.date==='string');
+ const points=all.slice(-indexPeriod);
+ if(points.length<2){status.textContent=item.theme+' 가격 자료 부족: '+(item.price_context?.error||'유효한 관측값이 2개 미만');return;}
+ const values=points.map(p=>p.close),min=Math.min(...values),max=Math.max(...values),pad=Math.max((max-min)*.08,max*.005,1),bottom=Math.max(0,min-pad),top=max+pad;
+ const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');svg.setAttribute('viewBox','0 0 840 320');svg.setAttribute('width','100%');svg.setAttribute('role','img');svg.setAttribute('aria-label',item.theme+' 실제 주가지수 포인트 추이');
+ const add=(tag,attrs,value)=>{const el=document.createElementNS('http://www.w3.org/2000/svg',tag);for(const [k,v] of Object.entries(attrs))el.setAttribute(k,String(v));if(value!==undefined)el.textContent=value;svg.append(el);return el};
+ const xp=i=>70+700*i/(points.length-1),yp=v=>255-210*(v-bottom)/(top-bottom);
+ for(let i=0;i<=4;i++){const y=255-210*i/4;add('line',{x1:70,x2:770,y1:y,y2:y,stroke:'#42536b'});add('text',{x:60,y:y+4,'text-anchor':'end',fill:'#c6d7ec','font-size':12},(bottom+(top-bottom)*i/4).toLocaleString('ko-KR',{maximumFractionDigits:0}))}
+ add('polyline',{points:values.map((v,i)=>xp(i)+','+yp(v)).join(' '),fill:'none',stroke:'#8ab9ff','stroke-width':3});
+ for(let i=0;i<=4;i++){const idx=Math.round((points.length-1)*i/4);add('text',{x:xp(idx),y:285,'text-anchor':'middle',fill:'#b4c7df','font-size':12},points[idx].date)}
+ plot.append(svg);
+ const first=values[0],last=values.at(-1),change=(last/first-1)*100;
+ status.textContent=item.theme+' · 최근 '+last.toLocaleString('ko-KR',{maximumFractionDigits:2})+'pt · 선택 기간 '+(change>=0?'+':'')+change.toFixed(2)+'% · 기준 '+points.at(-1).date+' · 실제 지수 포인트 (첫날 100 환산 아님)';
+}
 function renderPERDetail(){
  const rows=document.getElementById('per-only-rows'),status=document.getElementById('per-only-status');
  if(!rows||!status)return;
@@ -43,7 +69,7 @@ function renderPERDetail(){
  }
  if(!indices.length){const tr=document.createElement('tr'),td=document.createElement('td');td.colSpan=5;td.textContent='해당 국가의 종합지수 데이터가 없습니다.';tr.append(td);rows.append(tr)}
 }
-function renderPER(){renderPERDetail()}
+function renderPER(){renderPERDetail();renderIndexChart()}
 async function loadPER(){try{const r=await fetch('./per_history.json?t='+Date.now(),{cache:'no-store'});if(!r.ok)throw Error('HTTP '+r.status);perData=await r.json();renderPER()}catch(e){perData=null;renderPER();const status=document.getElementById('per-status');if(status)status.textContent='PER 데이터 불러오기 실패: '+e.message;}}
 let shortData=null;let data=null,market='전체';const $=id=>document.getElementById(id);function elem(tag,value){const e=document.createElement(tag);e.textContent=value??'';return e}function cell(row,value){row.appendChild(elem('td',value))}
 
@@ -114,9 +140,11 @@ function renderShort(){
  $('short-errors').textContent=(d.errors||[]).map(e=>e.ticker+': '+e.message).join(' | ');
 }
 async function loadShort(){try{const r=await fetch('./short_term.json?t='+Date.now(),{cache:'no-store'});if(!r.ok)throw Error('HTTP '+r.status);shortData=await r.json();renderShort()}catch(e){$('short-status').textContent='단기 데이터 조회 실패: '+e.message}}
-function selectView(view){$('long-view').hidden=view!=='long';$('short-view').hidden=view!=='short';$('per-view').hidden=view!=='per';$('per-panel').hidden=true;$('long-errors').hidden=view!=='long';$('long-tab').classList.toggle('selected',view==='long');$('short-tab').classList.toggle('selected',view==='short');$('per-tab').classList.toggle('selected',view==='per');if(view==='per')renderPERDetail()}
+function selectView(view){$('long-view').hidden=view!=='long';$('short-view').hidden=view!=='short';$('per-view').hidden=view!=='per';$('per-panel').hidden=true;$('long-errors').hidden=view!=='long';$('long-tab').classList.toggle('selected',view==='long');$('short-tab').classList.toggle('selected',view==='short');$('per-tab').classList.toggle('selected',view==='per');if(view==='per'){renderPERDetail();renderIndexChart()}}
 $('long-tab').addEventListener('click',()=>selectView('long'));
 $('short-tab').addEventListener('click',()=>{selectView('short');loadShort()});$('per-tab').addEventListener('click',()=>selectView('per'));for(const [id,value] of [['per-only-all','전체'],['per-only-kr','한국'],['per-only-us','미국']])document.getElementById(id).addEventListener('click',()=>{perCountry=value;for(const key of ['per-only-all','per-only-kr','per-only-us'])document.getElementById(key).classList.toggle('selected',key===id);renderPERDetail()});
+document.getElementById('index-chart-select').addEventListener('change',e=>{selectedIndexTicker=e.target.value;renderIndexChart()});
+document.getElementById('index-chart-period').addEventListener('change',e=>{indexPeriod=Number(e.target.value);renderIndexChart()});
 async function load(){try{const r=await fetch('./data.json?t='+Date.now(),{cache:'no-store'});if(!r.ok)throw Error('HTTP '+r.status);data=await r.json();const stamp=new Date(data.generated_at_utc);if(data.version!=='4.2'){$('status').textContent='데이터 버전 '+(data.version||'미상')+' · 최신 데이터 배포 필요';return;}$('status').textContent='ETF 신호등 · '+data.status+' · '+stamp.toLocaleString('ko-KR',{timeZone:'Asia/Seoul'})+' KST · '+data.themes.length+'개 테마'+(data.etf_trend_version?' · ETF 신호등 데이터 '+data.etf_trend_version:' · ETF 신호등 데이터 미생성')+(Date.now()-stamp.getTime()>36*3600000?' · 데이터 지연 주의':'');render()}catch(e){$('status').textContent='데이터 조회 실패: '+e.message}}
 document.querySelectorAll('[data-market]').forEach(b=>b.addEventListener('click',()=>{market=b.dataset.market;document.querySelectorAll('[data-market]').forEach(x=>x.classList.toggle('selected',x===b));render()}));$('reload').addEventListener('click',()=>{load();loadPER();if(!$('short-view').hidden)loadShort()});
 setInterval(()=>{if(document.hidden)return;load();loadPER();if(!$('short-view').hidden)loadShort()},10*60*1000);
