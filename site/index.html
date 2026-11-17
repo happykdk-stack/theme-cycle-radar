@@ -12,7 +12,7 @@
 </div>
 <section class="panel" id="per-panel" hidden><h2>ETF별 PER 및 관측 추이</h2><p class="muted small">PER은 금융정보 제공처가 ETF 시세에 표시한 값으로, 구성종목 가중 PER과 일치한다는 보장이 없습니다. 값이 없으면 N/A로 표시합니다. 과거 추이는 실제 수집한 날짜부터 축적하며, 원유 선물 ETF에는 기업 PER을 적용하지 않습니다.</p><div id="per-status" class="small muted">PER 데이터를 불러오는 중…</div><div class="tablewrap"><table><thead><tr><th>시장</th><th>ETF</th><th>PER</th><th>기준일</th><th>관측 기록</th><th>PER 추이</th></tr></thead><tbody id="per-rows"></tbody></table></div><div id="per-chart" class="small muted"></div></section>
 <div id="per-view" hidden>
-<section class="panel" id="kospi-monthly-reference"><h2>코스피 월별 PER 추이 (참고 자료)</h2><p class="small muted">2025년 10월~2026년 9월, 앞서 대화에서 제시된 월별 PER 12개를 시각화했습니다. <strong>공식 ECOS/KRX 원자료와 직접 대조하지 않은 미검증 수치</strong>이며 투자 판단용 공식 PER로 사용하면 안 됩니다. 검증된 자동 수집 PER과 구분해 표시합니다.</p><div id="kospi-monthly-chart" role="img" aria-label="미검증 코스피 월별 PER 12개월 추이" style="width:100%;overflow-x:auto"></div><div class="tablewrap"><table><thead><tr><th>월</th><th>PER (배, 미검증)</th></tr></thead><tbody id="kospi-monthly-rows"></tbody></table></div></section>
+
 <section class="panel"><h2>실제 PER 추이 · 종합주가지수 · 반등 확인일</h2><p class="muted small">ETF 또는 국가별 종합주가지수를 선택하면 실제 수집된 PER 관측치와 실제 주가지수 또는 ETF 가격을 표시합니다. 반등 확인일은 과거 20거래일 저점 이후 20거래일 안에 5% 상승이 확인된 날로, 사후 검증 결과이며 미래 반등 예측이 아닙니다.</p>
 <div class="controls"><label for="per-select">ETF · 주요 주가지수 선택</label><select id="per-select" style="padding:8px;background:#203b59;color:white;border-radius:8px;max-width:100%"></select></div>
 <div class="controls" aria-label="PER 표시 항목"><label><input id="per-show-pe" type="checkbox" checked> 실제 PER</label><label><input id="per-show-price" type="checkbox" checked> 주가지수·ETF 가격</label></div><div id="per-summary" class="small muted">데이터를 불러오는 중…</div><div class="controls"><button id="per-period-all" type="button" class="selected">전체 기간</button><button id="per-period-90" type="button">최근 90일</button><button id="per-period-30" type="button">최근 30일</button></div><div id="per-plot" class="panel"></div>
@@ -31,26 +31,6 @@ const KOSPI_MONTHLY_REFERENCE=[
  ["2026-04",27.36],["2026-05",32.28],["2026-06",23.06],
  ["2026-07",18.03],["2026-08",18.64],["2026-09",11.40]
 ];
-function renderKospiMonthlyReference(){
- const target=document.getElementById('kospi-monthly-chart'),rows=document.getElementById('kospi-monthly-rows');
- if(!target||!rows)return;
- target.replaceChildren();rows.replaceChildren();
- const create=tag=>document.createElementNS('http://www.w3.org/2000/svg',tag);
- const svg=create('svg');svg.setAttribute('viewBox','0 0 780 320');svg.setAttribute('width','100%');
- const add=(tag,attrs,label)=>{const el=create(tag);for(const [k,v] of Object.entries(attrs))el.setAttribute(k,String(v));if(label!==undefined)el.textContent=label;svg.append(el);return el};
- const min=0,max=35,px=i=>55+690*i/(KOSPI_MONTHLY_REFERENCE.length-1),py=v=>270-230*(v-min)/(max-min);
- for(let v=0;v<=35;v+=5){const y=py(v);add('line',{x1:55,y1:y,x2:745,y2:y,stroke:'#40536c'});add('text',{x:44,y:y+4,'text-anchor':'end',fill:'#c9d7e8','font-size':12},v+'배')}
- add('polyline',{points:KOSPI_MONTHLY_REFERENCE.map((d,i)=>px(i)+','+py(d[1])).join(' '),fill:'none',stroke:'#f1a9c5','stroke-width':3});
- KOSPI_MONTHLY_REFERENCE.forEach(([date,value],i)=>{
-  add('circle',{cx:px(i),cy:py(value),r:4,fill:'#f1a9c5'});
-  add('text',{x:px(i),y:py(value)-11,'text-anchor':'middle',fill:'#f1a9c5','font-size':11},value.toFixed(2));
-  add('text',{x:px(i),y:291,'text-anchor':'middle',fill:'#c9d7e8','font-size':11},date.slice(2));
-  const tr=document.createElement('tr');
-  for(const val of [date,value.toFixed(2)]){const td=document.createElement('td');td.textContent=val;tr.append(td)}rows.append(tr);
- });
- target.append(svg);
-}
-
 function renderPERDetail(){
  const select=document.getElementById('per-select'),summary=document.getElementById('per-summary'),plot=document.getElementById('per-plot'),tbody=document.getElementById('per-rebounds');
  if(!select||!summary||!plot||!tbody)return;
@@ -65,7 +45,7 @@ function renderPERDetail(){
  const points=startDate?allPoints.filter(p=>p.date>=startDate):allPoints;
  summary.textContent=x.theme+(x.kind==='index'?' · 종합주가지수':' · ETF')+' · 최근 확인 PER '+(x.pe==null?'N/A (검증된 PER 자료 미연결)':x.pe+'배')+' · PER 관측 '+allPoints.length+'건 · 가격 '+allPrices.length+'거래일 · PER 출처: '+(x.source||'자료 미연결')+' · 관측 기준일 '+(x.asof||'없음');
  plot.replaceChildren();tbody.replaceChildren();
- if(allPoints.length<2){
+ if(allPoints.length<2&&x.ticker!=='^KS11'){
   const warning=document.createElement('p');warning.className='warn';
   const why=x.pe_error||(x.kind==='index'?(x.ticker==='^KS11'?(perData?.index_pe_errors?.ECOS||'코스피 공식 PER 데이터 연결 미설정'):'해당 지수의 검증된 과거 PER 공급원이 연결되지 않았습니다.'):(x.error||'PER 제공처에서 유효한 값을 받지 못했습니다.'));
   warning.textContent='실제 PER 데이터 상태: '+why+' · 관측값 '+allPoints.length+'개. 관측값 1개면 점만 표시하며 2개 이상부터 선을 표시합니다. 가격으로 PER을 만들지 않습니다.';
@@ -74,10 +54,14 @@ function renderPERDetail(){
  const create=tag=>document.createElementNS('http://www.w3.org/2000/svg',tag);
  const showPE=document.getElementById('per-show-pe')?.checked!==false;
  const showPrice=document.getElementById('per-show-price')?.checked!==false;
- const peSeries=points.filter(p=>Number.isFinite(p.pe)).map(p=>({date:p.date,value:p.pe}));
+ const verifiedPE=points.filter(p=>Number.isFinite(p.pe)).map(p=>({date:p.date,value:p.pe}));
+ const usingReference=x.ticker==='^KS11'&&verifiedPE.length<2;
+ const referencePoints=usingReference?KOSPI_MONTHLY_REFERENCE.map(([month,pe])=>({date:month+'-01',value:pe})).filter(p=>!startDate||p.date>=startDate):[];
+ const peSeries=usingReference?referencePoints:verifiedPE;
  const priceSeries=prices.filter(p=>Number.isFinite(p.close)).map(p=>({date:p.date,value:p.close}));
  const activePE=showPE&&peSeries.length>=1,activePrice=showPrice&&priceSeries.length>=2;
  const chartTitle=document.createElement('h3');chartTitle.textContent='PER · '+(x.kind==='index'?'종합주가지수':'ETF 가격')+' 통합 차트';plot.append(chartTitle);
+ if(usingReference){const refNotice=document.createElement('p');refNotice.className='warn';refNotice.textContent='분홍 PER은 이전 대화의 월별 참고 수치(2025.10~2026.09)이며 KRX·ECOS 원자료와 미대조 상태입니다. 공식 PER로 사용하지 마세요. 파란 지수선은 실제 수집 가격입니다.';plot.append(refNotice)}
  if(!activePE&&!activePrice){const p=document.createElement('p');p.textContent='선택한 항목에 실제 관측값이 없습니다. PER을 체크해도 원자료가 없으면 그래프가 나타나지 않습니다.';plot.append(p)}
  else {
   const allDates=[...(activePE?peSeries:[]),...(activePrice?priceSeries:[])].map(p=>p.date).sort();
@@ -100,12 +84,12 @@ function renderPERDetail(){
   const markerDates=(pc.rebounds||[]).map(e=>e.confirmation_date).filter(d=>Date.parse(d)>=from&&Date.parse(d)<=to);
   if(activePrice)for(const d of markerDates){const p=priceSeries.find(z=>z.date===d);if(p)add('circle',{cx:xPos(d),cy:yPos(p.value,priceRange),r:4,fill:'#ffd38a'})}
   plot.append(svg);
-  const legend=document.createElement('p');legend.className='small muted';legend.textContent=(activePE?'분홍: 실제 PER(왼쪽 축) · ':'')+(activePrice?'파랑: 실제 지수/ETF 가격(오른쪽 축) · ':'')+'노랑 점: 사후 반등 확인일';plot.append(legend);
+  const legend=document.createElement('p');legend.className='small muted';legend.textContent=(activePE?(usingReference?'분홍: 미검증 참고 PER(왼쪽 축) · ':'분홍: 실제 PER(왼쪽 축) · '):'')+(activePrice?'파랑: 실제 지수/ETF 가격(오른쪽 축) · ':'')+'노랑 점: 사후 반등 확인일';plot.append(legend);
   const tip=document.createElement('p');tip.className='small muted';tip.textContent='마우스 대신 아래 날짜별 관측 목록으로 실제 값을 확인할 수 있습니다. PER 미관측 구간은 채우지 않습니다.';plot.append(tip);
-  const details=document.createElement('details'),summary=document.createElement('summary');summary.textContent='실제 PER 관측 날짜와 값 ('+peSeries.length+'개)';details.append(summary);
+  const details=document.createElement('details'),summary=document.createElement('summary');summary.textContent=(usingReference?'미검증 참고 PER':'실제 PER')+' 관측 날짜와 값 ('+peSeries.length+'개)';details.append(summary);
   const list=document.createElement('div');list.className='small muted';list.textContent=peSeries.length?peSeries.map(p=>p.date+' '+fmt(p.value)+'배').join(' · '):'실제 PER 관측값 없음';details.append(list);plot.append(details);
  }
- const notice=document.createElement('p');notice.className='small muted';notice.textContent='실제 PER과 지수는 서로 다른 Y축을 사용합니다. 후행·당해·차년도 예상 PER은 검증된 개별 시계열이 연결되기 전에는 표시하지 않습니다. 반등은 가격 기반 사후 판정이며 PER로 예측한 결과가 아닙니다.';plot.append(notice);
+ const notice=document.createElement('p');notice.className='small muted';notice.textContent='PER과 지수는 서로 다른 Y축을 사용합니다. 후행·당해·차년도 예상 PER은 검증된 개별 시계열이 연결되기 전에는 표시하지 않습니다. 반등은 가격 기반 사후 판정이며 PER로 예측한 결과가 아닙니다.';plot.append(notice);
  for(const e of [...(pc.rebounds||[])].reverse().filter(e=>!startDate||e.confirmation_date>=startDate)){
   const tr=document.createElement('tr'),known=allPoints.find(p=>p.date===e.low_date);
   for(const v of [e.low_date,e.confirmation_date,'+'+e.rise_pct+'%',e.sessions+'거래일',known?known.pe+'배':'N/A']){const td=document.createElement('td');td.textContent=v;tr.append(td)}tbody.append(tr);
@@ -211,5 +195,5 @@ $('short-tab').addEventListener('click',()=>{selectView('short');loadShort()});$
 async function load(){try{const r=await fetch('./data.json?t='+Date.now(),{cache:'no-store'});if(!r.ok)throw Error('HTTP '+r.status);data=await r.json();const stamp=new Date(data.generated_at_utc);if(data.version!=='4.2'){$('status').textContent='데이터 버전 '+(data.version||'미상')+' · 최신 데이터 배포 필요';return;}$('status').textContent='ETF 신호등 · '+data.status+' · '+stamp.toLocaleString('ko-KR',{timeZone:'Asia/Seoul'})+' KST · '+data.themes.length+'개 테마'+(data.etf_trend_version?' · ETF 신호등 데이터 '+data.etf_trend_version:' · ETF 신호등 데이터 미생성')+(Date.now()-stamp.getTime()>36*3600000?' · 데이터 지연 주의':'');render()}catch(e){$('status').textContent='데이터 조회 실패: '+e.message}}
 document.querySelectorAll('[data-market]').forEach(b=>b.addEventListener('click',()=>{market=b.dataset.market;document.querySelectorAll('[data-market]').forEach(x=>x.classList.toggle('selected',x===b));render()}));$('reload').addEventListener('click',()=>{load();loadPER();if(!$('short-view').hidden)loadShort()});
 setInterval(()=>{if(document.hidden)return;load();loadPER();if(!$('short-view').hidden)loadShort()},10*60*1000);
-renderKospiMonthlyReference();load();loadPER();
+load();loadPER();
 </script></body></html>
