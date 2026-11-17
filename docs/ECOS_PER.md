@@ -1,12 +1,11 @@
-# 코스피 PER 공식 ECOS 자동 연결
+# 공식 코스피 PER 자동 수집
 
-한국은행 ECOS 공식 StatisticSearch API를 지원합니다. 인증키와 **검증된** 코스피 PER 통계표 코드·항목 코드를 입력해야 실제 월별 PER이 표시됩니다.
+기존에는 ECOS 통계표·항목 코드까지 수동 입력해야 했습니다. 이제 `ECOS_API_KEY`가 설정되면 공식 ECOS 통계표·항목 목록에서 **코스피 PER이라고 명확히 확인되는 단일 월별 시계열**을 찾아 수집하도록 개선했습니다.
 
-- GitHub Repository Settings → Secrets and variables → Actions → Secrets: `ECOS_API_KEY`
-- 같은 화면 Variables: `ECOS_KOSPI_PER_STAT_CODE`, `ECOS_KOSPI_PER_ITEM_CODE`
-- 통계코드와 항목코드는 https://ecos.bok.or.kr 에서 실제 '코스피 주가수익비율(PER)' 시계열의 코드인지 확인해야 합니다. 확인되지 않은 코드를 임의로 넣지 마세요.
-- 수집 결과는 `site/per_history.json`의 `indices["^KS11"].history`에 실제 날짜와 PER 배수로 저장됩니다.
-- 값이 없거나 인증 실패 시 오류 상태를 표시하고 PER 선은 생성하지 않습니다.
-- 데이터 이용 약관과 GitHub Pages 공개 재배포 허용 여부를 확인해야 합니다.
+- 필요한 값: GitHub Actions Secret `ECOS_API_KEY` (한국은행 ECOS에서 발급)
+- 선택 사항: `ECOS_KOSPI_PER_STAT_CODE`, `ECOS_KOSPI_PER_ITEM_CODE` (정확히 검증된 경우)
+- 찾은 시계열이 0개이거나 여러 개이면 임의 선택하지 않고 오류를 기록합니다.
+- 공식 시계열이 제공되지 않거나 라이선스상 공개 게시가 허용되지 않으면 공개 Pages에 PER을 게시하지 마세요.
+- PER 원자료가 없으면 주가지수 가격으로 PER을 추정하지 않습니다.
 
-**현재 코드만 반영한 상태에서는 인증키·검증된 항목 코드가 없으므로 실제 코스피 PER 데이터가 자동으로 채워지지 않습니다.**
+API 키는 GitHub 저장소 코드나 공개 CSV에 적지 마세요. 인증키는 GitHub Settings → Secrets and variables → Actions → Repository secrets에 보관합니다.

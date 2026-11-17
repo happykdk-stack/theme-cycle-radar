@@ -160,16 +160,50 @@ def ecos_index_pe(api_key, stat_code, item_code, start="200401", end=None):
         if value is not None:found[month+"01"]={"date":month[:4]+"-"+month[4:]+"-01","pe":value}
     return sorted(found.values(),key=lambda x:x["date"])
 
+def ecos_json(service,key,*parts):
+    from urllib.parse import quote
+    url="https://ecos.bok.or.kr/api/"+"/".join([service,quote(key,safe=""),"json","kr",*[quote(str(x),safe="") for x in parts]])
+    with urlopen(Request(url,headers={"User-Agent":"CycleDetector/1.0"}),timeout=20) as response:
+        return json.load(response)
+
+def discover_ecos_kospi_per(key):
+    """Discover a KOSPI P/E series only when table AND item labels confirm it."""
+    payload=ecos_json("StatisticTableList",key,1,1500)
+    rows=payload.get("StatisticTableList",{}).get("row",[])
+    matches=[]
+    for table in rows:
+        name=str(table.get("STAT_NAME","")).replace(" ","")
+        if table.get("SRCH_YN")!="Y" or not ("주가이익비율" in name or "주가수익비율" in name or "PER" in name.upper()):
+            continue
+        code=table.get("STAT_CODE")
+        items=ecos_json("StatisticItemList",key,1,1000,code).get("StatisticItemList",{}).get("row",[])
+        for item in items:
+            label=" ".join(str(item.get(k,"")) for k in ("ITEM_NAME","ITEM_NAME1","ITEM_NAME2","ITEM_NAME3","ITEM_NAME4"))
+            if "코스피" not in label.replace(" ","") and "KOSPI" not in label.upper() and "코스피" not in name:
+                continue
+            if "PER" not in (name+" "+label).upper() and "주가이익비율" not in name and "주가수익비율" not in name:
+                continue
+            item_code=item.get("ITEM_CODE") or item.get("ITEM_CODE1")
+            if item_code and str(item.get("CYCLE","M")).upper() in ("M",""):
+                matches.append((code,str(item_code),str(table.get("STAT_NAME",""))+" / "+label))
+    if len(matches)!=1:
+        raise ValueError("ECOS KOSPI PER code discovery ambiguous or unavailable: "+str(len(matches))+" matches")
+    return matches[0]
+
 def configured_ecos_pe():
     import os
     key=os.environ.get("ECOS_API_KEY","")
     code=os.environ.get("ECOS_KOSPI_PER_STAT_CODE","")
     item=os.environ.get("ECOS_KOSPI_PER_ITEM_CODE","")
-    if not all((key,code,item)):return {},{"ECOS":"ECOS key/statistic/item code not configured"}
+    if not key:return {},{"ECOS":"ECOS_API_KEY missing; official KOSPI PER cannot be downloaded"}
     try:
+        if not code or not item:
+            code,item,discovered_name=discover_ecos_kospi_per(key)
+        else:
+            discovered_name="configured verified KOSPI PER"
         points=ecos_index_pe(key,code,item)
         if len(points)<12:raise ValueError("ECOS PER series has fewer than 12 observations")
-        return {"^KS11":{"history":points,"source":"Bank of Korea ECOS StatisticSearch; configured KOSPI PER monthly series","frequency":"monthly"}},{}
+        return {"^KS11":{"history":points,"source":"Bank of Korea ECOS StatisticSearch; '+discovered_name+'","frequency":"monthly"}},{}
     except Exception as exc:
         return {},{"ECOS":str(exc)[:160]}
 
@@ -237,7 +271,7 @@ def build(fetch=fetch_pe,prior=None,asof=None,fetch_prices=series_download,fetch
                          "price_context":ctx,"pe_error":pe_errors.get(ticker),
                          "source":historical.get("source","No verified historical index P/E feed connected"),
                          "pe_frequency":historical.get("frequency")}
-    return {"version":"1.4","generated_at_utc":datetime.now(timezone.utc).isoformat(timespec="seconds"),
+    return {"version":"1.5","generated_at_utc":datetime.now(timezone.utc).isoformat(timespec="seconds"),
             "history_source_error":history_error,"index_pe_errors":pe_errors,"etfs":etfs,"indices":indices,
             "note":"ETF PER observations start at collection. Index prices are genuine index levels. S&P 500 monthly historical trailing P/E is loaded from Multpl when available. Estimates are excluded. KRX index P/E is loaded only from a provenance-labelled authorized CSV when supplied. Other index P/E remains N/A. Rebound events are retrospective, not predictions."}
 
