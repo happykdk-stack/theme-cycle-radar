@@ -13,16 +13,19 @@ test('main navigation includes independent PER analysis',()=>{
  assert.match(html,/id="per-view"/);
  assert.match(html,/id="per-select"/);
 });
-test('PER chart shows real valuation and real price on separate axes',()=>{
- assert.match(html,/실제 PER 왼쪽 축/);
+test('PER and index charts render in separate panels',()=>{
+ assert.match(html,/id="per-plot"/);
+ assert.match(html,/id="price-plot"/);
+ assert.match(html,/PER 전용 그래프/);
+ assert.match(html,/종합주가지수 · ETF 가격 그래프/);
  assert.match(html,/peSeries/);
  assert.match(html,/priceSeries/);
  assert.match(html,/x\.source/);
  assert.doesNotMatch(html,/const normalized=prices\.map/);
 });
 test('PER chart does not interpolate missing observations',()=>{
- assert.match(html,/PER 미관측 구간은 채우지 않습니다/);
- assert.match(html,/peSeries\.length>=2/);
+ assert.match(html,/PER 원자료가 없어 표시할 수 없습니다/);
+ assert.match(html,/series\.length>=2/);
 });
 test('market traffic lights and refresh remain available',()=>{
  assert.match(html,/id="theme-scores"/);
