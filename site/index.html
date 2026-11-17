@@ -12,6 +12,7 @@
 </div>
 <section class="panel" id="per-panel" hidden><h2>ETF별 PER 및 관측 추이</h2><p class="muted small">PER은 금융정보 제공처가 ETF 시세에 표시한 값으로, 구성종목 가중 PER과 일치한다는 보장이 없습니다. 값이 없으면 N/A로 표시합니다. 과거 추이는 실제 수집한 날짜부터 축적하며, 원유 선물 ETF에는 기업 PER을 적용하지 않습니다.</p><div id="per-status" class="small muted">PER 데이터를 불러오는 중…</div><div class="tablewrap"><table><thead><tr><th>시장</th><th>ETF</th><th>PER</th><th>기준일</th><th>관측 기록</th><th>PER 추이</th></tr></thead><tbody id="per-rows"></tbody></table></div><div id="per-chart" class="small muted"></div></section>
 <div id="per-view" hidden>
+<section class="panel" id="kospi-monthly-reference"><h2>코스피 월별 PER 추이 (참고 자료)</h2><p class="small muted">2025년 10월~2026년 9월, 앞서 대화에서 제시된 월별 PER 12개를 시각화했습니다. <strong>공식 ECOS/KRX 원자료와 직접 대조하지 않은 미검증 수치</strong>이며 투자 판단용 공식 PER로 사용하면 안 됩니다. 검증된 자동 수집 PER과 구분해 표시합니다.</p><div id="kospi-monthly-chart" role="img" aria-label="미검증 코스피 월별 PER 12개월 추이" style="width:100%;overflow-x:auto"></div><div class="tablewrap"><table><thead><tr><th>월</th><th>PER (배, 미검증)</th></tr></thead><tbody id="kospi-monthly-rows"></tbody></table></div></section>
 <section class="panel"><h2>실제 PER 추이 · 종합주가지수 · 반등 확인일</h2><p class="muted small">ETF 또는 국가별 종합주가지수를 선택하면 실제 수집된 PER 관측치와 실제 주가지수 또는 ETF 가격을 표시합니다. 반등 확인일은 과거 20거래일 저점 이후 20거래일 안에 5% 상승이 확인된 날로, 사후 검증 결과이며 미래 반등 예측이 아닙니다.</p>
 <div class="controls"><label for="per-select">ETF · 주요 주가지수 선택</label><select id="per-select" style="padding:8px;background:#203b59;color:white;border-radius:8px;max-width:100%"></select></div>
 <div class="controls" aria-label="PER 표시 항목"><label><input id="per-show-pe" type="checkbox" checked> 실제 PER</label><label><input id="per-show-price" type="checkbox" checked> 주가지수·ETF 가격</label></div><div id="per-summary" class="small muted">데이터를 불러오는 중…</div><div class="controls"><button id="per-period-all" type="button" class="selected">전체 기간</button><button id="per-period-90" type="button">최근 90일</button><button id="per-period-30" type="button">최근 30일</button></div><div id="per-plot" class="panel"></div>
@@ -23,6 +24,33 @@
 <section class="panel" id="long-errors"><h2>데이터 수집 오류 및 한계</h2><div id="errors" class="small muted"></div><ul id="limitations" class="small muted"></ul></section><footer>연구용 ETF 테마 추정 모델. 실시간 데이터나 투자 추천이 아닙니다.</footer></main>
 <script>
 let perData=null;let selectedPER=null;let perWindow=0;
+
+const KOSPI_MONTHLY_REFERENCE=[
+ ["2025-10",18.97],["2025-11",18.12],["2025-12",17.56],
+ ["2026-01",21.84],["2026-02",26.04],["2026-03",21.01],
+ ["2026-04",27.36],["2026-05",32.28],["2026-06",23.06],
+ ["2026-07",18.03],["2026-08",18.64],["2026-09",11.40]
+];
+function renderKospiMonthlyReference(){
+ const target=document.getElementById('kospi-monthly-chart'),rows=document.getElementById('kospi-monthly-rows');
+ if(!target||!rows)return;
+ target.replaceChildren();rows.replaceChildren();
+ const create=tag=>document.createElementNS('http://www.w3.org/2000/svg',tag);
+ const svg=create('svg');svg.setAttribute('viewBox','0 0 780 320');svg.setAttribute('width','100%');
+ const add=(tag,attrs,label)=>{const el=create(tag);for(const [k,v] of Object.entries(attrs))el.setAttribute(k,String(v));if(label!==undefined)el.textContent=label;svg.append(el);return el};
+ const min=0,max=35,px=i=>55+690*i/(KOSPI_MONTHLY_REFERENCE.length-1),py=v=>270-230*(v-min)/(max-min);
+ for(let v=0;v<=35;v+=5){const y=py(v);add('line',{x1:55,y1:y,x2:745,y2:y,stroke:'#40536c'});add('text',{x:44,y:y+4,'text-anchor':'end',fill:'#c9d7e8','font-size':12},v+'배')}
+ add('polyline',{points:KOSPI_MONTHLY_REFERENCE.map((d,i)=>px(i)+','+py(d[1])).join(' '),fill:'none',stroke:'#f1a9c5','stroke-width':3});
+ KOSPI_MONTHLY_REFERENCE.forEach(([date,value],i)=>{
+  add('circle',{cx:px(i),cy:py(value),r:4,fill:'#f1a9c5'});
+  add('text',{x:px(i),y:py(value)-11,'text-anchor':'middle',fill:'#f1a9c5','font-size':11},value.toFixed(2));
+  add('text',{x:px(i),y:291,'text-anchor':'middle',fill:'#c9d7e8','font-size':11},date.slice(2));
+  const tr=document.createElement('tr');
+  for(const val of [date,value.toFixed(2)]){const td=document.createElement('td');td.textContent=val;tr.append(td)}rows.append(tr);
+ });
+ target.append(svg);
+}
+
 function renderPERDetail(){
  const select=document.getElementById('per-select'),summary=document.getElementById('per-summary'),plot=document.getElementById('per-plot'),tbody=document.getElementById('per-rebounds');
  if(!select||!summary||!plot||!tbody)return;
@@ -183,5 +211,5 @@ $('short-tab').addEventListener('click',()=>{selectView('short');loadShort()});$
 async function load(){try{const r=await fetch('./data.json?t='+Date.now(),{cache:'no-store'});if(!r.ok)throw Error('HTTP '+r.status);data=await r.json();const stamp=new Date(data.generated_at_utc);if(data.version!=='4.2'){$('status').textContent='데이터 버전 '+(data.version||'미상')+' · 최신 데이터 배포 필요';return;}$('status').textContent='ETF 신호등 · '+data.status+' · '+stamp.toLocaleString('ko-KR',{timeZone:'Asia/Seoul'})+' KST · '+data.themes.length+'개 테마'+(data.etf_trend_version?' · ETF 신호등 데이터 '+data.etf_trend_version:' · ETF 신호등 데이터 미생성')+(Date.now()-stamp.getTime()>36*3600000?' · 데이터 지연 주의':'');render()}catch(e){$('status').textContent='데이터 조회 실패: '+e.message}}
 document.querySelectorAll('[data-market]').forEach(b=>b.addEventListener('click',()=>{market=b.dataset.market;document.querySelectorAll('[data-market]').forEach(x=>x.classList.toggle('selected',x===b));render()}));$('reload').addEventListener('click',()=>{load();loadPER();if(!$('short-view').hidden)loadShort()});
 setInterval(()=>{if(document.hidden)return;load();loadPER();if(!$('short-view').hidden)loadShort()},10*60*1000);
-load();loadPER();
+renderKospiMonthlyReference();load();loadPER();
 </script></body></html>
