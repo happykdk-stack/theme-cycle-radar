@@ -203,7 +203,7 @@ def configured_ecos_pe():
             discovered_name="configured verified KOSPI PER"
         points=ecos_index_pe(key,code,item)
         if len(points)<12:raise ValueError("ECOS PER series has fewer than 12 observations")
-        return {"^KS11":{"history":points,"source":"Bank of Korea ECOS StatisticSearch; '+discovered_name+'","frequency":"monthly"}},{}
+        return {"^KS11":{"history":points,"source":"Bank of Korea ECOS StatisticSearch; "+discovered_name,"frequency":"monthly"}},{}
     except Exception as exc:
         return {},{"ECOS":str(exc)[:160]}
 
