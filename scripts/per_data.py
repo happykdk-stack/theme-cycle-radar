@@ -102,7 +102,7 @@ def parse_multpl(html):
         try:date=_dt.strptime(date_text.strip(),"%b %d, %Y").date().isoformat()
         except ValueError:continue
         # Do not mix estimated values with observed historical P/E.
-        if "Estimate" in pe_text or "†" in pe_text:continue
+        if "estimate" in pe_text.lower() or "†" in pe_text:continue
         import re
         match=re.search(r"(\d+(?:\.\d+)?)",pe_text)
         value=valid_pe(match.group(1)) if match else None
@@ -218,6 +218,7 @@ def historical_index_pe():
         with urlopen(req,timeout=18) as response:raw=response.read().decode("utf-8","replace")
         observations=parse_multpl(raw)
         if len(observations)<12:raise ValueError("Historical S&P 500 PER table incomplete")
+        if observations[-1]["date"]<"2025-01-01":raise ValueError("Historical S&P 500 PER table stale")
         result["^GSPC"]={"history":observations[-120:],"source":"Multpl.com / Robert Shiller, trailing 12-month reported earnings; monthly observations","frequency":"monthly"}
     except Exception as exc:errors["^GSPC"]=str(exc)[:160]
     return result,errors
@@ -284,4 +285,6 @@ if __name__=="__main__":
     data=build()
     OUT.parent.mkdir(parents=True,exist_ok=True)
     OUT.write_text(json.dumps(data,ensure_ascii=False,indent=2),encoding="utf-8")
+    print("Index PER available:",[(k,v["pe"],v["asof"]) for k,v in data["indices"].items() if v["pe"] is not None])
+    print("Index PER source errors:",data["index_pe_errors"])
     print("ETF PER observed",sum(v["pe"] is not None for v in data["etfs"].values()),"of",len(data["etfs"]))
