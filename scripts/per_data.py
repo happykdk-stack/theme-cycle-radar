@@ -263,13 +263,6 @@ def build(fetch=fetch_pe,prior=None,asof=None,fetch_prices=series_download,fetch
                       "history":history,"pbr":pbr_value,"pbr_history":pbr_history,"pbr_source":"Yahoo Finance priceToBook ETF quote (not verified portfolio PBR)","error":err,"price_context":context,
                       "source":"Yahoo Finance ETF quote trailingPE (provider methodology unverified)"}
     index_pe,pe_errors=fetch_index_pe()
-    ecos_data,ecos_errors=configured_ecos_pe()
-    index_pe.update(ecos_data)
-    pe_errors.update(ecos_errors)
-    try:
-        index_pe.update(krx_csv_pe())
-    except Exception as exc:
-        pe_errors["KRX_CSV"]=str(exc)[:160]
     indices={}
     for market,name,ticker in INDICES:
         ctx=price_context(ticker,fetch_prices)
@@ -283,9 +276,9 @@ def build(fetch=fetch_pe,prior=None,asof=None,fetch_prices=series_download,fetch
                          "price_context":ctx,"pe_error":pe_errors.get(ticker),
                          "source":historical.get("source","No verified historical index P/E feed connected"),
                          "pe_frequency":historical.get("frequency")}
-    return {"version":"1.6","generated_at_utc":datetime.now(timezone.utc).isoformat(timespec="seconds"),
+    return {"version":"1.7","generated_at_utc":datetime.now(timezone.utc).isoformat(timespec="seconds"),
             "history_source_error":history_error,"index_pe_errors":pe_errors,"etfs":etfs,"indices":indices,
-            "note":"ETF PER observations start at collection. Index prices are genuine index levels. S&P 500 monthly historical trailing P/E is loaded from Multpl when available. Estimates are excluded. KRX index P/E is loaded only from a provenance-labelled authorized CSV when supplied. Other index P/E remains N/A. Rebound events are retrospective, not predictions."}
+            "note":"ETF PER observations start at collection. Index prices are genuine index levels. S&P 500 monthly historical trailing P/E is loaded from Multpl when available. Estimates are excluded. Korean index P/E is N/A until a licensed and validated source is connected. Other index P/E remains N/A. Rebound events are retrospective, not predictions."}
 
 if __name__=="__main__":
     data=build()

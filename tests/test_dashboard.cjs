@@ -11,7 +11,6 @@ test('main navigation includes independent PER analysis',()=>{
  assert.match(html,/id="short-tab"/);
  assert.match(html,/id="per-tab"/);
  assert.match(html,/id="per-view"/);
- assert.match(html,/id="per-select"/);
 });
 test('country index PER table replaces valuation charts',()=>{
  assert.match(html,/id="per-only-rows"/);

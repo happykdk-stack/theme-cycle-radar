@@ -37,7 +37,7 @@ function renderPERDetail(){
  for(const x of indices){
   const tr=document.createElement('tr');
   const current=Number.isFinite(x.pe)?x.pe.toFixed(2)+'배':'N/A';
-  const reason=Number.isFinite(x.pe)?(x.source||'출처 미기재'):(x.pe_error|| (x.ticker==='^KS11'?perData.index_pe_errors?.ECOS:null)||'검증된 PER 데이터 미연결');
+  const reason=Number.isFinite(x.pe)?(x.source||'출처 미기재'):(x.pe_error||'검증된 PER 데이터 미연결 (자동 수집 가능 출처 없음)');
   for(const value of [x.market,x.theme,current,x.asof||'—',reason]){const td=document.createElement('td');td.textContent=value;tr.append(td)}
   rows.append(tr);
  }
