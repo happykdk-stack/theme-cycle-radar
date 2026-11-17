@@ -37,10 +37,13 @@ def previous_history():
     except Exception as exc:
         return {}, str(exc)[:160]
 
-def fetch_pe(ticker):
+def fetch_valuation(ticker):
     info=yf.Ticker(ticker).info or {}
-    # Not every ETF exposes a valid underlying portfolio P/E.
-    return valid_pe(info.get("trailingPE"))
+    return {"pe":valid_pe(info.get("trailingPE")),
+            "pbr":valid_pe(info.get("priceToBook"))}
+
+def fetch_pe(ticker):
+    return fetch_valuation(ticker)["pe"]
 
 def price_context(ticker, fetch_prices):
     try:
@@ -219,7 +222,7 @@ def historical_index_pe():
     except Exception as exc:errors["^GSPC"]=str(exc)[:160]
     return result,errors
 
-def build(fetch=fetch_pe,prior=None,asof=None,fetch_prices=series_download,fetch_index_pe=historical_index_pe):
+def build(fetch=fetch_pe,prior=None,asof=None,fetch_prices=series_download,fetch_index_pe=historical_index_pe,fetch_pbr=None):
     date=asof or datetime.now(timezone.utc).date().isoformat()
     if prior is None:
         prior,history_error=previous_history()
@@ -243,12 +246,21 @@ def build(fetch=fetch_pe,prior=None,asof=None,fetch_prices=series_download,fetch
             except Exception as exc:
                 err=str(exc)[:160]
         history=sorted(unique.values(),key=lambda p:p["date"])[-MAX_POINTS:]
+        pbr_previous={v["date"]:{"date":v["date"],"pbr":valid_pe(v["pbr"])} for v in old.get("pbr_history",[]) if isinstance(v,dict) and "date" in v and valid_pe(v.get("pbr")) is not None}
+        pbr_value=None
+        if ticker not in FUTURES:
+            try:
+                pbr_value=(fetch_pbr(ticker) if fetch_pbr is not None else valid_pe((yf.Ticker(ticker).info or {}).get("priceToBook")))
+                pbr_value=valid_pe(pbr_value)
+                if pbr_value is not None:pbr_previous[date]={"date":date,"pbr":pbr_value}
+            except Exception:pass
+        pbr_history=sorted(pbr_previous.values(),key=lambda v:v["date"])[-MAX_POINTS:]
         if value is None and history:
             status="stale" if ticker not in FUTURES else "not_applicable"
         context=price_context(ticker,fetch_prices)
         etfs[ticker]={"market":market,"theme":theme,"fund":fund,"ticker":ticker,
                       "pe":value,"status":status,"asof":date if value is not None else None,
-                      "history":history,"error":err,"price_context":context,
+                      "history":history,"pbr":pbr_value,"pbr_history":pbr_history,"pbr_source":"Yahoo Finance priceToBook ETF quote (not verified portfolio PBR)","error":err,"price_context":context,
                       "source":"Yahoo Finance ETF quote trailingPE (provider methodology unverified)"}
     index_pe,pe_errors=fetch_index_pe()
     ecos_data,ecos_errors=configured_ecos_pe()
@@ -267,11 +279,11 @@ def build(fetch=fetch_pe,prior=None,asof=None,fetch_prices=series_download,fetch
         indices[ticker]={"market":market,"theme":name,"fund":name,"ticker":ticker,
                          "kind":"index","pe":recent["pe"] if recent else None,
                          "status":"historical_monthly" if recent else "unavailable",
-                         "asof":recent["date"] if recent else None,"history":pe_points,
+                         "asof":recent["date"] if recent else None,"history":pe_points,"pbr":None,"pbr_history":[],"pbr_source":"No verified index PBR feed connected",
                          "price_context":ctx,"pe_error":pe_errors.get(ticker),
                          "source":historical.get("source","No verified historical index P/E feed connected"),
                          "pe_frequency":historical.get("frequency")}
-    return {"version":"1.5","generated_at_utc":datetime.now(timezone.utc).isoformat(timespec="seconds"),
+    return {"version":"1.6","generated_at_utc":datetime.now(timezone.utc).isoformat(timespec="seconds"),
             "history_source_error":history_error,"index_pe_errors":pe_errors,"etfs":etfs,"indices":indices,
             "note":"ETF PER observations start at collection. Index prices are genuine index levels. S&P 500 monthly historical trailing P/E is loaded from Multpl when available. Estimates are excluded. KRX index P/E is loaded only from a provenance-labelled authorized CSV when supplied. Other index P/E remains N/A. Rebound events are retrospective, not predictions."}
 
