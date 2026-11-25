@@ -14,7 +14,7 @@ test('main navigation includes independent PER analysis',()=>{
 });
 test('country PER table and independent index chart are present',()=>{
  assert.match(html,/id="per-only-rows"/);
- assert.match(html,/국가별 종합주가지수 PER/);
+ assert.match(html,/국가별 주가지수 · PER/);
  assert.doesNotMatch(html,/id="per-plot"/);
  assert.doesNotMatch(html,/id="price-plot"/);
  assert.match(html,/id="index-price-chart"/);
