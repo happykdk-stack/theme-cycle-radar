@@ -26,16 +26,16 @@ test('missing PER values are explicit',()=>{
 });
 
 class Element{
- constructor(){this.children=[];this.textContent='';this.handlers={};this.value='';this.classList={toggle(){}};}
+ constructor(){this.children=[];this.textContent='';this.handlers={};this.attributes={};this.value='';this.classList={toggle(){}};}
  append(...items){this.children.push(...items);}
  appendChild(item){this.append(item);}
  replaceChildren(...items){this.children=items;this.textContent='';}
  addEventListener(name,fn){this.handlers[name]=fn;}
- setAttribute(){}
+ setAttribute(name,value){this.attributes[name]=value;}
  get text(){return this.textContent+this.children.map(x=>x.text).join(' ');}
 }
 function setup(){
- const nodes=new Map();const document={createElement:()=>new Element(),querySelectorAll:()=>[],getElementById:id=>{if(!nodes.has(id))nodes.set(id,new Element());return nodes.get(id);}};
+ const nodes=new Map();const document={createElement:()=>new Element(),createElementNS:()=>new Element(),createTextNode:text=>Object.assign(new Element(),{textContent:text}),querySelectorAll:()=>[],getElementById:id=>{if(!nodes.has(id))nodes.set(id,new Element());return nodes.get(id);}};
  const context=vm.createContext({document,Date,console,location:{hash:''},setInterval(){}});
  vm.runInContext(script[1].replace(/load\(\);loadPER\(\);\s*$/,''),context);
  return {nodes,run:text=>vm.runInContext(text,context)};
@@ -109,8 +109,8 @@ test('monthly comparisons handle year boundaries and zero changes, and reject di
 test('monthly table filters independently, exposes sources, and preserves gaps',()=>{
  const {nodes,run}=setup();
  run('monthlyPERData='+JSON.stringify(monthlyFixture)+';renderMonthlyPER()');
- assert.equal(nodes.get('per-monthly-rows').children.length,17);
- assert.match(nodes.get('per-monthly-highlight').text,/-9.39%/);
+ assert.equal(nodes.get('per-monthly-rows').children.length,7);
+ assert.match(nodes.get('per-monthly-highlight').text,/\+1.12%/);
  nodes.get('per-monthly-select').handlers.change({target:{value:'CIBR'}});
  const rows=nodes.get('per-monthly-rows').children;
  assert.equal(rows.length,2);
@@ -141,4 +141,39 @@ test('archived LIT months use the same earnings year and SOXX gaps remain explic
  assert.equal(rows.find(p=>p.ticker==='SOXX'&&p.date==='2025-04-30').pe,26.5);
  assert.equal(rows.find(p=>p.ticker==='SOXX'&&p.date==='2025-06-30').pe,33.78);
  assert.equal(rows.filter(p=>p.ticker==='SOXX'&&p.date==='2026-09-30').length,0,'inconsistent 60x cap disclosure is not treated as validated data');
+});
+
+test('PER graph preserves real time gaps and only connects comparable adjacent months',()=>{
+ const {run}=setup();
+ const per=run('monthlyChartGeometry(monthlyPERRows('+JSON.stringify(monthlyFixture.observations)+').filter(p=>p.ticker==="LIT"),"per",320)');
+ assert.equal(per.points.length,7);assert.equal(per.segments.length,1);
+ assert.equal(per.segments[0].from.date,'2016-08-31');assert.equal(per.segments[0].to.date,'2016-09-30');
+ const points=per.points;
+ const march=points.find(p=>p.date==='2016-03-31'),august=points.find(p=>p.date==='2016-08-31'),september=points.find(p=>p.date==='2016-09-30');
+ assert.ok(Math.abs((august.x-march.x)/(september.x-august.x)-5)<1e-8);
+ assert.equal(per.xticks.length,2);
+ const skyy=run('monthlyChartGeometry(monthlyPERRows('+JSON.stringify(monthlyFixture.observations)+').filter(p=>p.ticker==="SKYY"),"change",720)');
+ assert.equal(skyy.points.length,1);assert.ok(skyy.points[0].y>skyy.zero,'negative change bar must extend below zero');
+ const zero=run('monthlyChartGeometry([{date:"2026-01-30",pe:20,change_pct:0}],"change",320)');
+ assert.equal(zero.points[0].y,zero.zero);assert.ok(Number.isFinite(zero.points[0].x));
+});
+
+test('graph selection updates source details and unavailable changes stay empty',()=>{
+ const {nodes,run}=setup();run('monthlyPERData='+JSON.stringify(monthlyFixture)+';renderMonthlyPER()');
+ assert.match(nodes.get('per-monthly-readout').text,/2024-10.*20.61/);
+ const svg=nodes.get('per-monthly-chart').children[0];
+ const september=svg.children.find(p=>p.attributes['aria-label']?.startsWith('2016-09 PER'));
+ september.handlers.click();assert.match(nodes.get('per-monthly-readout').text,/23.46.*\+1.12%/);
+ assert.match(nodes.get('per-monthly-readout').children[2].children[2].href,/web.archive.org/);
+ nodes.get('per-chart-change').handlers.click();
+ assert.equal(nodes.get('per-monthly-chart').children[0].children.filter(p=>p.attributes.role==='button').length,1);
+ nodes.get('per-monthly-select').handlers.change({target:{value:'SOXX'}});
+ assert.match(nodes.get('per-monthly-chart').text,/월별 변화율을 계산할 수 없습니다/);
+ nodes.get('per-chart-level').handlers.click();
+ assert.equal(nodes.get('per-monthly-chart').children[0].children.filter(p=>p.attributes.role==='button').length,4);
+ nodes.get('per-chart-year').handlers.change({target:{value:'2025'}});
+ assert.equal(nodes.get('per-monthly-chart').children[0].children.filter(p=>p.attributes.role==='button').length,2);
+ run('monthlyPERData=null;monthlyPERError=true;renderMonthlyPER()');
+ assert.match(nodes.get('per-monthly-chart').text,/불러오지 못했습니다/);
+ assert.equal(nodes.get('per-monthly-readout').text,'');
 });
