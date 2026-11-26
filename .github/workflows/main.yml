@@ -32,6 +32,14 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Restore ETF PER observation history
+        uses: actions/cache/restore@v4
+        with:
+          path: data/etf_per_history.json
+          key: etf-per-history-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: |
+            etf-per-history-
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -54,8 +62,14 @@ jobs:
       - name: Update market data
         run: python scripts/update_v4.py
 
-      - name: Collect public index PER observations
+      - name: Collect ETF PER observations and daily slopes
         run: python scripts/per_data.py
+
+      - name: Preserve ETF PER observation history
+        uses: actions/cache/save@v4
+        with:
+          path: data/etf_per_history.json
+          key: etf-per-history-${{ github.run_id }}-${{ github.run_attempt }}
 
       - name: Update short-term crash rebound scan
         run: python scripts/short_term.py

@@ -7,12 +7,14 @@ from pathlib import Path
 from urllib.request import Request, urlopen
 import yfinance as yf
 from update import THEMES, ROOT, series_download
+from per_slopes import daily_per_slopes, LOOKBACK_SESSIONS
 
 OUT=ROOT/"site"/"per_history.json"
 PREVIOUS_URL="https://happykdk-stack.github.io/theme-cycle-radar/per_history.json"
 FUTURES={"261220.KS","USO"}
 MAX_POINTS=370
 KRX_CSV=ROOT/"data"/"krx_index_per.csv"
+HISTORY_CACHE=ROOT/"data"/"etf_per_history.json"
 INDICES=[
  ("한국","코스피","^KS11"),("한국","코스닥","^KQ11"),("한국","코스피200","^KS200"),
  ("미국","S&P 500","^GSPC"),("미국","나스닥 종합","^IXIC"),
@@ -26,16 +28,46 @@ def valid_pe(value):
     except (ValueError,TypeError,OverflowError):
         return None
 
+def load_history_cache():
+    try:
+        payload=json.loads(HISTORY_CACHE.read_text(encoding='utf-8'))
+        return payload['etfs'] if isinstance(payload.get('etfs'),dict) else {}
+    except (OSError,ValueError,KeyError,TypeError):
+        return {}
+
+
+def write_history_cache(payload):
+    snapshots={ticker:{'history':item.get('history',[]),
+                       'pbr_history':item.get('pbr_history',[])}
+               for ticker,item in payload['etfs'].items()}
+    HISTORY_CACHE.parent.mkdir(parents=True,exist_ok=True)
+    HISTORY_CACHE.write_text(json.dumps({'version':1,'source':'Yahoo Finance ETF quote observations',
+        'etfs':snapshots},ensure_ascii=False,indent=2),encoding='utf-8')
+
+
 def previous_history():
+    cached=load_history_cache()
     try:
         req=Request(PREVIOUS_URL+"?source=prior",headers={"User-Agent":"CycleDetector/1.0","Cache-Control":"no-cache"})
         with urlopen(req,timeout=12) as resp:
             payload=json.load(resp)
         if not isinstance(payload,dict) or not isinstance(payload.get("etfs"),dict):
-            return {}, "Previous history response invalid"
-        return payload["etfs"], None
+            return cached, "Previous history response invalid; using saved observations"
+        combined=dict(cached)
+        for ticker,item in payload['etfs'].items():
+            if not isinstance(item,dict):continue
+            old=cached.get(ticker,{})
+            merged={**old,**item}
+            for field,key in [('history','pe'),('pbr_history','pbr')]:
+                unique={}
+                for point in [*old.get(field,[]),*item.get(field,[])]:
+                    if isinstance(point,dict) and isinstance(point.get('date'),str) and valid_pe(point.get(key)) is not None:
+                        unique[point['date']]=point
+                merged[field]=sorted(unique.values(),key=lambda p:p['date'])[-MAX_POINTS:]
+            combined[ticker]=merged
+        return combined, None
     except Exception as exc:
-        return {}, str(exc)[:160]
+        return cached, str(exc)[:160]
 
 def fetch_valuation(ticker):
     info=yf.Ticker(ticker).info or {}
@@ -263,6 +295,7 @@ def build(fetch=fetch_pe,prior=None,asof=None,fetch_prices=series_download,fetch
                       "pe":value,"status":status,"asof":date if value is not None else None,
                       "history":history,"pbr":pbr_value,"pbr_history":pbr_history,"pbr_source":"Yahoo Finance priceToBook ETF quote (not verified portfolio PBR)","error":err,"price_context":context,
                       "source":"Yahoo Finance ETF quote trailingPE (provider methodology unverified)"}
+        etfs[ticker]['per_slope_history'] = daily_per_slopes(history, market, date)
     index_pe,pe_errors=fetch_index_pe()
     indices={}
     for market,name,ticker in INDICES:
@@ -277,12 +310,15 @@ def build(fetch=fetch_pe,prior=None,asof=None,fetch_prices=series_download,fetch
                          "price_context":ctx,"pe_error":pe_errors.get(ticker),
                          "source":historical.get("source","No verified historical index P/E feed connected"),
                          "pe_frequency":historical.get("frequency")}
-    return {"version":"1.7","generated_at_utc":datetime.now(timezone.utc).isoformat(timespec="seconds"),
+    return {"version":"1.8","per_slope_lookback_sessions":LOOKBACK_SESSIONS,
+            "per_slope_basis":"ETF quote observation dates; not verified closing valuation dates",
+            "generated_at_utc":datetime.now(timezone.utc).isoformat(timespec="seconds"),
             "history_source_error":history_error,"index_pe_errors":pe_errors,"etfs":etfs,"indices":indices,
             "note":"ETF PER observations start at collection. Index prices are genuine index levels. S&P 500 monthly historical trailing P/E is loaded from Multpl when available. Estimates are excluded. Korean index P/E is N/A until a licensed and validated source is connected. Other index P/E remains N/A. Rebound events are retrospective, not predictions."}
 
 if __name__=="__main__":
     data=build()
+    write_history_cache(data)
     OUT.parent.mkdir(parents=True,exist_ok=True)
     OUT.write_text(json.dumps(data,ensure_ascii=False,indent=2),encoding="utf-8")
     print("Index PER available:",[(k,v["pe"],v["asof"]) for k,v in data["indices"].items() if v["pe"] is not None])

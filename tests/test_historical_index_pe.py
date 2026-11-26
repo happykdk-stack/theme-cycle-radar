@@ -8,7 +8,7 @@ class HistoricalPERTests(unittest.TestCase):
   self.assertEqual(parse_multpl(html),[{"date":"2026-06-01","pe":25.22}])
  def test_index_source_and_missing_not_fabricated(self):
   def f():return {"^GSPC":{"history":[{"date":"2025-01-01","pe":20.0}],"source":"test","frequency":"monthly"}},{}
-  d=build(fetch=lambda t:None,fetch_prices=lambda t:__import__("pandas").DataFrame(),prior={},asof="2026-11-13",fetch_index_pe=f)
+  d=build(fetch=lambda t:None,fetch_prices=lambda t:__import__("pandas").DataFrame(),prior={},asof="2026-11-13",fetch_index_pe=f,fetch_pbr=lambda t:None)
   self.assertEqual(d["indices"]["^GSPC"]["pe"],20.)
   self.assertIsNone(d["indices"]["^KS11"]["pe"])
 if __name__=="__main__":unittest.main()
