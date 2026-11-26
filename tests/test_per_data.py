@@ -15,6 +15,10 @@ class PERTests(unittest.TestCase):
   self.assertEqual(d["etfs"]["SOXX"]["history"],[])
   self.assertIsNone(d["etfs"]["SOXX"]["pe"])
   self.assertEqual(d["etfs"]["USO"]["status"],"not_applicable")
+  self.assertEqual(d['etfs']['091160.KS']['reference_per']['date'],'2026-10-01')
+  self.assertEqual(d['etfs']['091160.KS']['reference_per']['pe'],8.57)
+  self.assertEqual(d['etfs']['091160.KS']['per_weekly_history'],[])
+  self.assertIsNone(d['etfs']['091160.KS']['pe'],'older portfolio reference must not become current quote P/E')
  def test_historical_observation_preserved(self):
   prior={"SOXX":{"history":[{"date":"2026-11-12","pe":20.0}]}}
   d=offline_build(fetch=lambda t:21.0,prior=prior,asof="2026-11-13")

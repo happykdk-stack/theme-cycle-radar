@@ -1,0 +1,12 @@
+{
+  "verified_on": "2026-11-26",
+  "note": "FnGuide 공개 주식 포트폴리오의 펀드 PER 열. 2026-10-01 기준 참고 수치이며 최근 주별 이력으로 사용하지 않습니다.",
+  "etfs": {
+    "091160.KS": {"date":"2026-10-01","pe":8.57,"basis":"공개 주식 포트폴리오의 펀드 PER · 세부 산출 방식 미확인","source":"에프앤가이드","source_url":"https://kwcomp.fnguide.com/etp/etfSnapshot?cmp_cd=091160"},
+    "305720.KS": {"date":"2026-10-01","pe":20.82,"basis":"공개 주식 포트폴리오의 펀드 PER · 세부 산출 방식 미확인","source":"에프앤가이드","source_url":"https://kwcomp.fnguide.com/etp/etfSnapshot?cmp_cd=305720"},
+    "244580.KS": {"date":"2026-10-01","pe":24.94,"basis":"공개 주식 포트폴리오의 펀드 PER · 세부 산출 방식 미확인","source":"에프앤가이드","source_url":"https://kwcomp.fnguide.com/etp/etfSnapshot?cmp_cd=244580"},
+    "445290.KS": {"date":"2026-10-01","pe":9.09,"basis":"공개 주식 포트폴리오의 펀드 PER · 세부 산출 방식 미확인","source":"에프앤가이드","source_url":"https://kwcomp.fnguide.com/etp/etfSnapshot?cmp_cd=445290"},
+    "449450.KS": {"date":"2026-10-01","pe":16.26,"basis":"공개 주식 포트폴리오의 펀드 PER · 세부 산출 방식 미확인","source":"에프앤가이드","source_url":"https://kwcomp.fnguide.com/etp/etfSnapshot?cmp_cd=449450"},
+    "433500.KS": {"date":"2026-10-01","pe":17.03,"basis":"공개 주식 포트폴리오의 펀드 PER · 세부 산출 방식 미확인","source":"에프앤가이드","source_url":"https://kwcomp.fnguide.com/etp/etfSnapshot?cmp_cd=433500"}
+  }
+}

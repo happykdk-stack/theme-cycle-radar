@@ -8,6 +8,7 @@ from urllib.request import Request, urlopen
 import yfinance as yf
 from update import THEMES, ROOT, series_download
 from per_slopes import daily_per_slopes, LOOKBACK_SESSIONS
+from per_weekly import weekly_per_observations
 
 OUT=ROOT/"site"/"per_history.json"
 PREVIOUS_URL="https://happykdk-stack.github.io/theme-cycle-radar/per_history.json"
@@ -15,6 +16,7 @@ FUTURES={"261220.KS","USO"}
 MAX_POINTS=370
 KRX_CSV=ROOT/"data"/"krx_index_per.csv"
 HISTORY_CACHE=ROOT/"data"/"etf_per_history.json"
+KR_REFERENCE=ROOT/"data"/"kr_etf_per_reference.json"
 INDICES=[
  ("한국","코스피","^KS11"),("한국","코스닥","^KQ11"),("한국","코스피200","^KS200"),
  ("미국","S&P 500","^GSPC"),("미국","나스닥 종합","^IXIC"),
@@ -33,6 +35,14 @@ def load_history_cache():
         payload=json.loads(HISTORY_CACHE.read_text(encoding='utf-8'))
         return payload['etfs'] if isinstance(payload.get('etfs'),dict) else {}
     except (OSError,ValueError,KeyError,TypeError):
+        return {}
+
+
+def load_kr_references():
+    try:
+        data = json.loads(KR_REFERENCE.read_text(encoding='utf-8'))
+        return data.get('etfs', {})
+    except (OSError, ValueError, TypeError):
         return {}
 
 
@@ -262,6 +272,7 @@ def build(fetch=fetch_pe,prior=None,asof=None,fetch_prices=series_download,fetch
     else:
         history_error=None
     etfs={}
+    kr_references=load_kr_references()
     for market,theme,ticker,fund in THEMES:
         old=prior.get(ticker,{}) if isinstance(prior,dict) else {}
         points=[p for p in old.get("history",[]) if isinstance(p,dict) and isinstance(p.get("date"),str) and valid_pe(p.get("pe")) is not None and p["date"]<=date]
@@ -296,6 +307,8 @@ def build(fetch=fetch_pe,prior=None,asof=None,fetch_prices=series_download,fetch
                       "history":history,"pbr":pbr_value,"pbr_history":pbr_history,"pbr_source":"Yahoo Finance priceToBook ETF quote (not verified portfolio PBR)","error":err,"price_context":context,
                       "source":"Yahoo Finance ETF quote trailingPE (provider methodology unverified)"}
         etfs[ticker]['per_slope_history'] = daily_per_slopes(history, market, date)
+        etfs[ticker]['per_weekly_history'] = weekly_per_observations(history, date)
+        etfs[ticker]['reference_per'] = kr_references.get(ticker)
     index_pe,pe_errors=fetch_index_pe()
     indices={}
     for market,name,ticker in INDICES:
@@ -310,7 +323,8 @@ def build(fetch=fetch_pe,prior=None,asof=None,fetch_prices=series_download,fetch
                          "price_context":ctx,"pe_error":pe_errors.get(ticker),
                          "source":historical.get("source","No verified historical index P/E feed connected"),
                          "pe_frequency":historical.get("frequency")}
-    return {"version":"1.8","per_slope_lookback_sessions":LOOKBACK_SESSIONS,
+    return {"version":"1.9","per_slope_lookback_sessions":LOOKBACK_SESSIONS,
+            "per_weekly_basis":"UTC quote observations grouped Monday-Sunday; last available observation, not verified weekly closing P/E; compare only adjacent calendar weeks",
             "per_slope_basis":"ETF quote observation dates; not verified closing valuation dates",
             "generated_at_utc":datetime.now(timezone.utc).isoformat(timespec="seconds"),
             "history_source_error":history_error,"index_pe_errors":pe_errors,"etfs":etfs,"indices":indices,
