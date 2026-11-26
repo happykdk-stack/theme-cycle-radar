@@ -11,6 +11,14 @@
 <section class="panel"><h2>테마별 신호등 상승 점수</h2><p class="muted small">월·주·일 HA 시가 대비 상승폭을 각각 5%·3%·1.5% 기준으로 정규화하고 50·30·20점으로 가중 합산합니다. 기존 방향 일치 점수는 별도 표시합니다. 추세의 일치도를 나타내는 점수이며 실제 상승 확률(%)은 아닙니다. 각 기간 OHLC를 하이킨 아시로 변환해 양봉·음봉을 판정합니다. 진행 중인 월·주봉은 미확정이며 완료된 일봉까지 계산합니다. 열린 화면은 10분마다 배포된 최신 데이터를 다시 읽습니다. 0점은 세 기간 모두 상승 조건을 충족하지 못했다는 뜻입니다. HA 종가가 HA 시가보다 높으면 상승, 낮으면 하락, 같으면 보합입니다. 데이터가 부족하면 점수를 산출하지 않습니다.</p><div class="tablewrap"><table><thead><tr><th>종합 신호등</th><th>시장</th><th>테마 ETF</th><th>상승 강도 점수</th><th>방향 일치 점수</th><th>월봉 · 50점</th><th>주봉 · 30점</th><th>일봉 · 20점</th><th>판정 기준일</th></tr></thead><tbody id="theme-scores"></tbody></table></div></section>
 </div>
 <div id="per-view" hidden>
+<section class="panel" aria-labelledby="per-monthly-heading"><h2 id="per-monthly-heading">ETF 월말 PER · 월별 변화율</h2>
+<p class="small muted">운용사 공개 자료에서 숫자를 확인한 월말 PER입니다. 전월 자료가 있는 경우에만 변화율을 계산합니다. 현재 확보된 일부 월만 표시하며, 빠진 달은 채우지 않습니다.</p>
+<div class="controls"><label for="per-monthly-select">월말 자료를 볼 ETF</label><select id="per-monthly-select" style="padding:8px;background:#203b59;color:white;border-radius:8px"><option value="전체">전체</option></select></div>
+<p id="per-monthly-status" class="small muted" role="status">월말 PER 자료를 불러오는 중…</p>
+<p id="per-monthly-highlight"></p>
+<div class="tablewrap"><table><thead><tr><th>ETF</th><th>기준월 · 기준일</th><th>PER 기준</th><th>PER (배)</th><th>전월 PER (배)</th><th>전월 대비 변화율</th><th>계산 상태</th><th>출처</th></tr></thead><tbody id="per-monthly-rows"></tbody></table></div>
+<details class="small muted"><summary>월별 변화율 계산·자료 범위</summary><p>월별 변화율 = (이번 달 말 PER ÷ 직전 달 말 PER − 1) × 100. 동일 ETF·제공처·지표의 연속된 두 달만 비교합니다. 월말 마지막 거래일 또는 자료에 명시된 월말 날짜를 사용합니다. 중간 달이 없으면 직전 관측값과 비교하지 않습니다.</p><p>선행 PER과 후행 PER은 서로 다른 지표입니다. SKYY는 운용사 공시의 Price/Earnings 항목이며 해당 문서에 선행·후행 구분이 명시되지 않았습니다. CIBR은 자료 본문의 두 월말 숫자만 수록했으며 그래프에서 값을 추정하지 않았습니다. 이 월말 자료는 아래 일별 관측값과 합치거나 15거래일 기울기로 변환하지 않습니다. 출처 문서는 이후 갱신될 수 있으며 확인일 당시 공시값을 보관합니다.</p></details>
+</section>
 <section class="panel"><h2>ETF별 PER · 15거래일 기울기</h2>
 <p class="small muted">ETF를 선택하면 날짜별 PER 관측 기록을 볼 수 있습니다. 15거래일 전 같은 ETF의 관측값과 비교하며, 비교값이 없으면 기울기를 계산하지 않습니다.</p>
 <div class="controls"><button id="per-only-all" class="selected" type="button">전체</button><button id="per-only-kr" type="button">🇰🇷 한국</button><button id="per-only-us" type="button">🇺🇸 미국</button></div>
@@ -31,6 +39,35 @@ let perData=null;
 let perCountry='전체',selectedPEREtf=null;
 const perNumber=(value,digits=2)=>Number.isFinite(value)?value.toLocaleString('ko-KR',{minimumFractionDigits:digits,maximumFractionDigits:digits}):'—';
 const perSigned=(value,digits=2)=>Number.isFinite(value)?(value>0?'+':'')+perNumber(value,digits):'—';
+let monthlyPERData=null,monthlyPEREtf='전체',monthlyPERError=false;
+function monthlyPERRows(observations){
+ const valid=(observations||[]).filter(p=>typeof p.date==='string'&&/^\d{4}-(0[1-9]|1[0-2])-\d{2}$/.test(p.date)&&Number.isFinite(p.pe)&&p.pe>0&&p.ticker&&p.series&&p.publisher&&p.basis);
+ return valid.map(point=>{
+  const year=Number(point.date.slice(0,4)),month=Number(point.date.slice(5,7));
+  const previousMonth=String(month===1?year-1:year)+'-'+String(month===1?12:month-1).padStart(2,'0');
+  const candidates=valid.filter(p=>p.ticker===point.ticker&&p.series===point.series&&p.publisher===point.publisher&&p.basis===point.basis&&p.date.slice(0,7)===previousMonth);
+  const prior=candidates.length===1?candidates[0]:null;
+  return {...point,previous_month:previousMonth,previous_pe:prior?.pe??null,change_pct:prior?(point.pe/prior.pe-1)*100:null};
+ }).sort((a,b)=>b.date.localeCompare(a.date)||a.ticker.localeCompare(b.ticker));
+}
+function renderMonthlyPER(){
+ const rows=document.getElementById('per-monthly-rows'),status=document.getElementById('per-monthly-status'),select=document.getElementById('per-monthly-select'),highlight=document.getElementById('per-monthly-highlight');
+ rows.replaceChildren();select.replaceChildren();highlight.textContent='';
+ const all=monthlyPERRows(monthlyPERData?.observations),tickers=[...new Set(all.map(p=>p.ticker))].sort();
+ if(!tickers.includes(monthlyPEREtf))monthlyPEREtf='전체';
+ for(const ticker of ['전체',...tickers]){const option=document.createElement('option');option.value=ticker;option.textContent=ticker;select.append(option);}select.value=monthlyPEREtf;
+ if(!monthlyPERData){status.textContent=monthlyPERError?'월말 PER 조회 실패 · 최신 데이터 다시 읽기를 눌러 주세요.':'월말 PER 자료를 불러오는 중…';perEmpty(rows,8,monthlyPERError?'월말 PER 자료를 불러오지 못했습니다.':'자료 확인 중');return;}
+ const records=all.filter(p=>monthlyPEREtf==='전체'||p.ticker===monthlyPEREtf);
+ status.textContent='자료 확인일 '+monthlyPERData.verified_on+' · '+tickers.length+'개 ETF · 월말 자료 '+all.length+'건 · 표시 '+records.length+'건 · 전월 대비 계산 가능 '+records.filter(p=>p.change_pct!==null).length+'건';
+ const example=records.find(p=>p.change_pct!==null);
+ if(example)highlight.textContent=example.ticker+' · '+example.date.slice(0,7)+' PER '+perNumber(example.pe)+'배 · 전월 '+perNumber(example.previous_pe)+'배 대비 '+perSigned(example.change_pct)+'%';
+ if(!records.length){perEmpty(rows,8,'확인된 월말 PER 자료가 없습니다.');return;}
+ for(const record of records){const tr=document.createElement('tr');
+  [record.ticker+' · '+record.theme,record.date.slice(0,7)+' · '+record.date,record.basis,perNumber(record.pe),perNumber(record.previous_pe),record.change_pct===null?'—':perSigned(record.change_pct)+'%',record.change_pct===null?record.previous_month+' 비교 자료 없음':'전월 대비 계산 완료'].forEach(value=>perCell(tr,value));
+  const source=perCell(tr,'');const link=document.createElement('a');link.textContent=record.publisher+' 원문';link.href=record.source_url;link.title=record.source_title;link.target='_blank';link.rel='noopener noreferrer';source.append(link);rows.append(tr);
+ }
+}
+async function loadMonthlyPER(){try{const response=await fetch('./per_monthly.json?t='+Date.now(),{cache:'no-store'});if(!response.ok)throw Error('HTTP '+response.status);const payload=await response.json();if(!Array.isArray(payload.observations))throw Error('Invalid monthly PER data');monthlyPERData=payload;monthlyPERError=false;}catch(error){monthlyPERData=null;monthlyPERError=true;}renderMonthlyPER();}
 function perRows(item){
  const calculated=item.per_slope_history;
  if(Array.isArray(calculated))return calculated;
@@ -86,7 +123,7 @@ function renderPERDetail(){
  renderPERDaily();
 }
 function renderPER(){renderPERDetail();}
-async function loadPER(){try{const response=await fetch('./per_history.json?t='+Date.now(),{cache:'no-store'});if(!response.ok)throw Error('HTTP '+response.status);perData=await response.json();renderPER();}catch(error){perData=null;renderPER();}}
+async function loadPER(){const monthlyLoad=loadMonthlyPER();try{const response=await fetch('./per_history.json?t='+Date.now(),{cache:'no-store'});if(!response.ok)throw Error('HTTP '+response.status);perData=await response.json();renderPER();}catch(error){perData=null;renderPER();}await monthlyLoad;}
 
 let shortData=null;let data=null,market='전체';const $=id=>document.getElementById(id);function elem(tag,value){const e=document.createElement(tag);e.textContent=value??'';return e}function cell(row,value){row.appendChild(elem('td',value))}
 
@@ -159,6 +196,7 @@ function renderShort(){
 async function loadShort(){try{const r=await fetch('./short_term.json?t='+Date.now(),{cache:'no-store'});if(!r.ok)throw Error('HTTP '+r.status);shortData=await r.json();renderShort()}catch(e){$('short-status').textContent='단기 데이터 조회 실패: '+e.message}}
 function selectView(view){$('long-view').hidden=view!=='long';$('short-view').hidden=view!=='short';$('per-view').hidden=view!=='per';$('long-errors').hidden=view!=='long';$('long-tab').classList.toggle('selected',view==='long');$('short-tab').classList.toggle('selected',view==='short');$('per-tab').classList.toggle('selected',view==='per');if(view==='per')renderPERDetail()}
 $('long-tab').addEventListener('click',()=>selectView('long'));
+document.getElementById('per-monthly-select').addEventListener('change',event=>{monthlyPEREtf=event.target.value;renderMonthlyPER();});
 $('short-tab').addEventListener('click',()=>{selectView('short');loadShort()});$('per-tab').addEventListener('click',()=>{selectView('per');loadPER()});document.getElementById('per-etf-select').addEventListener('change',event=>{selectedPEREtf=event.target.value;renderPERDetail()});for(const [id,value] of [['per-only-all','전체'],['per-only-kr','한국'],['per-only-us','미국']])document.getElementById(id).addEventListener('click',()=>{perCountry=value;for(const key of ['per-only-all','per-only-kr','per-only-us'])document.getElementById(key).classList.toggle('selected',key===id);renderPERDetail()});
 async function load(){try{const r=await fetch('./data.json?t='+Date.now(),{cache:'no-store'});if(!r.ok)throw Error('HTTP '+r.status);data=await r.json();const stamp=new Date(data.generated_at_utc);if(data.version!=='4.2'){$('status').textContent='데이터 버전 '+(data.version||'미상')+' · 최신 데이터 배포 필요';return;}$('status').textContent='ETF 신호등 · '+data.status+' · '+stamp.toLocaleString('ko-KR',{timeZone:'Asia/Seoul'})+' KST · '+data.themes.length+'개 테마'+(data.etf_trend_version?' · ETF 신호등 데이터 '+data.etf_trend_version:' · ETF 신호등 데이터 미생성')+(Date.now()-stamp.getTime()>36*3600000?' · 데이터 지연 주의':'');render()}catch(e){$('status').textContent='데이터 조회 실패: '+e.message}}
 document.querySelectorAll('[data-market]').forEach(b=>b.addEventListener('click',()=>{market=b.dataset.market;document.querySelectorAll('[data-market]').forEach(x=>x.classList.toggle('selected',x===b));render()}));$('reload').addEventListener('click',()=>{load();loadPER();if(!$('short-view').hidden)loadShort()});

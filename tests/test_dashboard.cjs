@@ -78,3 +78,47 @@ test('market traffic lights and refresh remain available',()=>{
  assert.match(html,/setInterval/);
  assert.match(html,/loadPER\(\)/);
 });
+
+const monthlyFixture=JSON.parse(fs.readFileSync(path.join(__dirname,'../site/per_monthly.json'),'utf8'));
+test('published monthly evidence has six sourced observations and one adjacent-month comparison',()=>{
+ const {run}=setup();
+ assert.equal(monthlyFixture.observations.length,6);
+ for(const p of monthlyFixture.observations){
+  assert.ok(p.date<=monthlyFixture.verified_on);
+  assert.ok(p.pe>0&&p.basis&&p.series&&p.source_title);
+  assert.equal(new URL(p.source_url).protocol,'https:');
+ }
+ const rows=run('monthlyPERRows('+JSON.stringify(monthlyFixture.observations)+')');
+ const skyy=rows.find(p=>p.ticker==='SKYY'&&p.date==='2026-10-30');
+ assert.equal(skyy.previous_pe,29.71);
+ assert.ok(Math.abs(skyy.change_pct-(-9.390777515988))<1e-9);
+ assert.equal(rows.filter(p=>p.change_pct!==null).length,1);
+ assert.ok(rows.filter(p=>p.ticker==='CIBR').every(p=>p.change_pct===null));
+});
+test('monthly comparisons handle year boundaries and zero changes, and reject differing methods or ambiguous baselines',()=>{
+ const {run}=setup();
+ const p={ticker:'TEST',series:'trailing',publisher:'Issuer',basis:'TTM',date:'2025-12-31',pe:20};
+ const current={...p,date:'2026-01-30'};
+ const calculate=points=>run('monthlyPERRows('+JSON.stringify(points)+')')[0];
+ assert.equal(calculate([p,current]).change_pct,0);
+ assert.equal(calculate([p,{...current,pe:30}]).change_pct,50);
+ for(const mismatch of [{series:'forward'},{publisher:'Other'},{basis:'FY1'}])assert.equal(calculate([p,{...current,...mismatch}]).change_pct,null);
+ assert.equal(calculate([p,{...p,date:'2025-12-30'},current]).change_pct,null);
+ assert.equal(calculate([{...p,pe:0},current]).change_pct,null);
+});
+test('monthly table filters independently, exposes sources, and preserves gaps',()=>{
+ const {nodes,run}=setup();
+ run('monthlyPERData='+JSON.stringify(monthlyFixture)+';renderMonthlyPER()');
+ assert.equal(nodes.get('per-monthly-rows').children.length,6);
+ assert.match(nodes.get('per-monthly-highlight').text,/-9.39%/);
+ nodes.get('per-monthly-select').handlers.change({target:{value:'CIBR'}});
+ const rows=nodes.get('per-monthly-rows').children;
+ assert.equal(rows.length,2);
+ assert.ok(rows.every(row=>row.children[5].textContent==='—'));
+ assert.match(rows[0].text,/2023-10 비교 자료 없음/);
+ assert.match(rows[0].children[7].children[0].href,/ftportfolios.com/);
+ assert.match(rows[0].text,/선행 PER/);
+ run('monthlyPERData=null;monthlyPERError=true;renderMonthlyPER()');
+ assert.match(nodes.get('per-monthly-status').text,/조회 실패/);
+ assert.doesNotMatch(nodes.get('per-monthly-rows').text,/23.30/);
+});

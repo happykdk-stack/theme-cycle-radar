@@ -1,0 +1,43 @@
+{
+  "version": "1.0",
+  "verified_on": "2026-11-26",
+  "note": "공개 문서에서 수치를 확인한 월말만 수록. 연속 월의 동일 ETF·동일 지표·동일 제공처만 비교합니다. 출처 링크의 문서는 이후 갱신될 수 있으며 수록값은 확인일 당시의 공시값입니다.",
+  "observations": [
+    {
+      "ticker": "SKYY", "theme": "클라우드", "date": "2026-09-30", "pe": 29.71,
+      "series": "first-trust-skyy-price-earnings", "basis": "운용사 공시 P/E · 선행/후행 미명시",
+      "publisher": "First Trust", "source_title": "SKYY Fact Sheet · 2026-09-30 · 2쪽 Portfolio Information",
+      "source_url": "https://www.ftportfolios.com/LoadContent/grhurpjtga"
+    },
+    {
+      "ticker": "SKYY", "theme": "클라우드", "date": "2026-10-30", "pe": 26.92,
+      "series": "first-trust-skyy-price-earnings", "basis": "운용사 공시 P/E · 선행/후행 미명시",
+      "publisher": "First Trust", "source_title": "SKYY Fund Characteristics · 2026-10-30",
+      "source_url": "https://www.ftportfolios.com/retail/ETF/ETFsummary.aspx?Ticker=SKYY"
+    },
+    {
+      "ticker": "ITA", "theme": "항공·방산", "date": "2026-09-30", "pe": 34.84,
+      "series": "blackrock-ita-trailing-pe", "basis": "후행 12개월 · 적자 제외 · 종목 PER 상한 60배",
+      "publisher": "BlackRock", "source_title": "ITA Fact Sheet · 2026-09-30 · 1쪽 Fund Characteristics, 3쪽 Glossary",
+      "source_url": "https://www.blackrock.com/us/individual/literature/fact-sheet/ita-ishares-u-s-aerospace-defense-etf-fund-fact-sheet-en-us.pdf"
+    },
+    {
+      "ticker": "XBI", "theme": "바이오", "date": "2026-09-30", "pe": 21.07,
+      "series": "ssga-xbi-forward-fy1-pe", "basis": "선행 FY1 · 가중 조화평균",
+      "publisher": "State Street", "source_title": "XBI Fact Sheet · 2026-09-30 · 1쪽 Characteristics",
+      "source_url": "https://www.ssga.com/library-content/products/factsheets/etfs/us/factsheet-us-en-xbi.pdf"
+    },
+    {
+      "ticker": "CIBR", "theme": "사이버보안", "date": "2022-12-31", "pe": 24.0,
+      "series": "first-trust-cibr-forward-pe", "basis": "선행 PER · Bloomberg/FactSet",
+      "publisher": "First Trust", "source_title": "Attractive Relative Valuations Bolster the Case for Cybersecurity · 2023-12-06 · 1쪽 본문·각주 2",
+      "source_url": "https://www.ftportfolios.com/Commentary/Insights/2023/12/14/attractive-relative-valuations-bolster-the-case-for-cybersecurity"
+    },
+    {
+      "ticker": "CIBR", "theme": "사이버보안", "date": "2023-11-30", "pe": 23.3,
+      "series": "first-trust-cibr-forward-pe", "basis": "선행 PER · Bloomberg/FactSet",
+      "publisher": "First Trust", "source_title": "Attractive Relative Valuations Bolster the Case for Cybersecurity · 2023-12-06 · 1쪽 본문·각주 2",
+      "source_url": "https://www.ftportfolios.com/Commentary/Insights/2023/12/14/attractive-relative-valuations-bolster-the-case-for-cybersecurity"
+    }
+  ]
+}
