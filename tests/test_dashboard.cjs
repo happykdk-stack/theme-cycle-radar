@@ -80,9 +80,9 @@ test('market traffic lights and refresh remain available',()=>{
 });
 
 const monthlyFixture=JSON.parse(fs.readFileSync(path.join(__dirname,'../site/per_monthly.json'),'utf8'));
-test('published monthly evidence has six sourced observations and one adjacent-month comparison',()=>{
+test('published monthly evidence has sourced observations and two adjacent-month comparisons',()=>{
  const {run}=setup();
- assert.equal(monthlyFixture.observations.length,6);
+ assert.equal(monthlyFixture.observations.length,17);
  for(const p of monthlyFixture.observations){
   assert.ok(p.date<=monthlyFixture.verified_on);
   assert.ok(p.pe>0&&p.basis&&p.series&&p.source_title);
@@ -92,7 +92,7 @@ test('published monthly evidence has six sourced observations and one adjacent-m
  const skyy=rows.find(p=>p.ticker==='SKYY'&&p.date==='2026-10-30');
  assert.equal(skyy.previous_pe,29.71);
  assert.ok(Math.abs(skyy.change_pct-(-9.390777515988))<1e-9);
- assert.equal(rows.filter(p=>p.change_pct!==null).length,1);
+ assert.equal(rows.filter(p=>p.change_pct!==null).length,2);
  assert.ok(rows.filter(p=>p.ticker==='CIBR').every(p=>p.change_pct===null));
 });
 test('monthly comparisons handle year boundaries and zero changes, and reject differing methods or ambiguous baselines',()=>{
@@ -109,7 +109,7 @@ test('monthly comparisons handle year boundaries and zero changes, and reject di
 test('monthly table filters independently, exposes sources, and preserves gaps',()=>{
  const {nodes,run}=setup();
  run('monthlyPERData='+JSON.stringify(monthlyFixture)+';renderMonthlyPER()');
- assert.equal(nodes.get('per-monthly-rows').children.length,6);
+ assert.equal(nodes.get('per-monthly-rows').children.length,17);
  assert.match(nodes.get('per-monthly-highlight').text,/-9.39%/);
  nodes.get('per-monthly-select').handlers.change({target:{value:'CIBR'}});
  const rows=nodes.get('per-monthly-rows').children;
@@ -121,4 +121,24 @@ test('monthly table filters independently, exposes sources, and preserves gaps',
  run('monthlyPERData=null;monthlyPERError=true;renderMonthlyPER()');
  assert.match(nodes.get('per-monthly-status').text,/조회 실패/);
  assert.doesNotMatch(nodes.get('per-monthly-rows').text,/23.30/);
+});
+
+test('archived LIT months use the same earnings year and SOXX gaps remain explicit',()=>{
+ const {nodes,run}=setup();
+ run('monthlyPERData='+JSON.stringify(monthlyFixture)+';renderMonthlyPER()');
+ nodes.get('per-monthly-select').handlers.change({target:{value:'LIT'}});
+ assert.equal(nodes.get('per-monthly-rows').children.length,7);
+ assert.match(nodes.get('per-monthly-highlight').text,/2016-09.*23.46.*23.20.*\+1.12%/);
+ const rows=run('monthlyPERRows(monthlyPERData.observations)');
+ const lit=rows.find(p=>p.ticker==='LIT'&&p.date==='2016-09-30');
+ assert.equal(lit.earnings_year,2016);
+ assert.ok(Math.abs(lit.change_pct-1.12068965517)<1e-9);
+ assert.equal(rows.filter(p=>p.ticker==='LIT'&&p.change_pct!==null).length,1);
+ nodes.get('per-monthly-select').handlers.change({target:{value:'SOXX'}});
+ assert.equal(nodes.get('per-monthly-rows').children.length,4);
+ assert.match(nodes.get('per-monthly-highlight').text,/연속 월말 자료가 없어/);
+ assert.ok(nodes.get('per-monthly-rows').children.every(p=>p.children[5].textContent==='—'));
+ assert.equal(rows.find(p=>p.ticker==='SOXX'&&p.date==='2025-04-30').pe,26.5);
+ assert.equal(rows.find(p=>p.ticker==='SOXX'&&p.date==='2025-06-30').pe,33.78);
+ assert.equal(rows.filter(p=>p.ticker==='SOXX'&&p.date==='2026-09-30').length,0,'inconsistent 60x cap disclosure is not treated as validated data');
 });
